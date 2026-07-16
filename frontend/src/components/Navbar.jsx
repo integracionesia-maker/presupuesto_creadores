@@ -3,6 +3,7 @@ export default function Navbar({ activeTab, onTabChange, onNewTicket }) {
     { key: "dashboard", label: "Dashboard" },
     { key: "creators", label: "Creadores" },
     { key: "transactions", label: "Transacciones" },
+    { key: "admin", label: "Administración" },
   ];
 
   return (

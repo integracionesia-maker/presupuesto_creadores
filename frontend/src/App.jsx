@@ -4,6 +4,7 @@ import Dashboard from "./components/Dashboard";
 import CreatorList from "./components/CreatorList";
 import TransactionTable from "./components/TransactionTable";
 import UploadTicketModal from "./components/UploadTicketModal";
+import AdminView from "./components/AdminView";
 import { fetchCreators, fetchCreatorsKpi, fetchBrands } from "./api";
 
 function firstOfMonth(y, m) {
@@ -30,14 +31,14 @@ export default function App() {
     return { start: firstOfMonth(t.getFullYear(), t.getMonth()), end: t };
   });
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const [c, k, b] = await Promise.all([
         fetchCreators(),
         fetchCreatorsKpi(),
-        fetchBrands(true),
+        fetchBrands(false), // incluye marcas inactivas para la vista de administración
       ]);
       setCreators(c);
       setKpi(k);
@@ -45,7 +46,7 @@ export default function App() {
     } catch (e) {
       setError(e.message);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
@@ -114,6 +115,13 @@ export default function App() {
               <TransactionTable
                 creators={creators}
                 brands={brands}
+              />
+            )}
+            {activeTab === "admin" && (
+              <AdminView
+                creators={creators}
+                brands={brands}
+                onChange={() => loadData({ silent: true })}
               />
             )}
           </>

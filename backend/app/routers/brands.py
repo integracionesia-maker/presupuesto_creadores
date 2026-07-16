@@ -3,6 +3,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import crud, schemas
@@ -26,7 +27,11 @@ def get_brand(brand_id: int, db: Session = Depends(get_db)):
 
 @router.post("/", response_model=schemas.BrandResponse, status_code=201)
 def create_brand(data: schemas.BrandCreate, db: Session = Depends(get_db)):
-    return crud.create_brand(db, data)
+    try:
+        return crud.create_brand(db, data)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Ya existe una marca con ese nombre.")
 
 
 @router.put("/{brand_id}", response_model=schemas.BrandResponse)
@@ -34,4 +39,8 @@ def update_brand(brand_id: int, data: schemas.BrandUpdate, db: Session = Depends
     brand = crud.get_brand(db, brand_id)
     if not brand:
         raise HTTPException(status_code=404, detail="Marca no encontrada.")
-    return crud.update_brand(db, brand, data)
+    try:
+        return crud.update_brand(db, brand, data)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Ya existe una marca con ese nombre.")

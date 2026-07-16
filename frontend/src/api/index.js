@@ -37,6 +37,13 @@ export function createCreator(data) {
   });
 }
 
+export function updateCreator(id, data) {
+  return request(`/creators/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 /* ── Brands ──────────────────────────────────────────────────────────────── */
 
 export function fetchBrands(activeOnly = true) {
@@ -47,6 +54,13 @@ export function fetchBrands(activeOnly = true) {
 export function createBrand(data) {
   return request("/brands/", {
     method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateBrand(id, data) {
+  return request(`/brands/${id}`, {
+    method: "PUT",
     body: JSON.stringify(data),
   });
 }
