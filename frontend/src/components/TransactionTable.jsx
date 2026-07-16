@@ -1,5 +1,38 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { fetchTickets, ticketFileUrl } from "../api";
+
+const PAGE_SIZES = [10, 25, 50, 100];
+
+/* Columnas ordenables: key = campo del ticket */
+const SORTABLE_COLUMNS = [
+  { key: "upload_date", label: "Fecha de carga" },
+  { key: "creator_name", label: "Creador" },
+  { key: "brand_name", label: "Marca" },
+  { key: "amount", label: "Monto", align: "right" },
+];
+
+function SortIcon({ dir }) {
+  if (dir === "asc") {
+    return (
+      <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
+      </svg>
+    );
+  }
+  if (dir === "desc") {
+    return (
+      <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+      </svg>
+    );
+  }
+  /* Estado predeterminado: doble chevron tenue */
+  return (
+    <svg className="h-3 w-3 opacity-40" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4M8 15l4 4 4-4" />
+    </svg>
+  );
+}
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat("es-MX", {
@@ -29,6 +62,53 @@ export default function TransactionTable({ creators, brands }) {
   const [filterCreator, setFilterCreator] = useState("");
   const [filterBrand, setFilterBrand] = useState("");
 
+  /* Orden de 3 estados: null (predeterminado) → "asc" → "desc" → null */
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState(null);
+
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+
+  const cycleSort = (key) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir("asc");
+    } else if (sortDir === "asc") {
+      setSortDir("desc");
+    } else {
+      setSortKey(null);
+      setSortDir(null);
+    }
+    setPage(1);
+  };
+
+  const sortedTickets = useMemo(() => {
+    if (!sortKey || !sortDir) return tickets; // orden predeterminado (fecha desc, del backend)
+    const sorted = [...tickets].sort((a, b) => {
+      let cmp;
+      if (sortKey === "amount") {
+        cmp = a.amount - b.amount;
+      } else if (sortKey === "upload_date") {
+        cmp = new Date(a.upload_date) - new Date(b.upload_date);
+      } else {
+        cmp = (a[sortKey] || "").localeCompare(b[sortKey] || "", "es", {
+          sensitivity: "base",
+        });
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [tickets, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageTickets = sortedTickets.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+  const rangeStart = sortedTickets.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = Math.min(currentPage * pageSize, sortedTickets.length);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -39,7 +119,10 @@ export default function TransactionTable({ creators, brands }) {
       brandName: filterBrand || undefined,
     })
       .then((data) => {
-        if (!cancelled) setTickets(data);
+        if (!cancelled) {
+          setTickets(data);
+          setPage(1); // los filtros cambiaron: volver a la primera página
+        }
       })
       .catch((e) => {
         if (!cancelled) setError(e.message);
@@ -181,15 +264,35 @@ export default function TransactionTable({ creators, brands }) {
           <table className="go-table">
             <thead>
               <tr>
-                <th>Fecha de carga</th>
-                <th>Creador</th>
-                <th>Marca</th>
-                <th className="text-right">Monto</th>
+                {SORTABLE_COLUMNS.map((col) => {
+                  const active = sortKey === col.key;
+                  return (
+                    <th key={col.key} className={col.align === "right" ? "text-right" : ""}>
+                      <button
+                        onClick={() => cycleSort(col.key)}
+                        title={
+                          !active
+                            ? "Ordenar ascendente"
+                            : sortDir === "asc"
+                            ? "Ordenar descendente"
+                            : "Quitar orden"
+                        }
+                        className={`inline-flex items-center gap-1.5 font-display text-[11px] font-bold uppercase tracking-[0.10em] transition-colors ${
+                          col.align === "right" ? "justify-end" : ""
+                        }`}
+                        style={{ color: active ? "var(--go-orange)" : "inherit" }}
+                      >
+                        {col.label}
+                        <SortIcon dir={active ? sortDir : null} />
+                      </button>
+                    </th>
+                  );
+                })}
                 <th className="text-center">Comprobante</th>
               </tr>
             </thead>
             <tbody>
-              {tickets.map((t) => (
+              {pageTickets.map((t) => (
                 <tr key={t.id}>
                   <td style={{ color: "var(--go-gray-2)" }}>
                     {formatDate(t.upload_date)}
@@ -240,6 +343,68 @@ export default function TransactionTable({ creators, brands }) {
               ))}
             </tbody>
           </table>
+
+          {/* ── Pagination footer ─────────────────────────────────────── */}
+          <div
+            className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+            style={{ borderTop: "1px solid var(--go-dark-600)" }}
+          >
+            <span className="font-body text-xs" style={{ color: "var(--go-gray-2)" }}>
+              Mostrando {rangeStart}–{rangeEnd} de {sortedTickets.length}
+            </span>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <label
+                className="font-body text-xs"
+                style={{ color: "var(--go-gray-2)" }}
+              >
+                Filas por página
+              </label>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="go-select w-auto py-1.5 text-xs"
+              >
+                {PAGE_SIZES.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="btn-go-ghost px-2.5 py-1.5 disabled:opacity-40 disabled:pointer-events-none"
+                  title="Página anterior"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span
+                  className="font-body text-xs tabular-nums"
+                  style={{ color: "var(--go-gray-2)" }}
+                >
+                  Página {currentPage} de {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="btn-go-ghost px-2.5 py-1.5 disabled:opacity-40 disabled:pointer-events-none"
+                  title="Página siguiente"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
