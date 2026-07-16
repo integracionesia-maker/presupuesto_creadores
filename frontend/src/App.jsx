@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import Navbar from "./components/Navbar";
+import { Routes, Route, Navigate } from "react-router-dom";
+import Sidebar from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import CreatorList from "./components/CreatorList";
 import TransactionTable from "./components/TransactionTable";
-import UploadTicketModal from "./components/UploadTicketModal";
 import AdminView from "./components/AdminView";
+import UploadTicketModal from "./components/UploadTicketModal";
+import HomePage from "./pages/HomePage";
 import { fetchCreators, fetchCreatorsKpi, fetchBrands } from "./api";
 
 function firstOfMonth(y, m) {
@@ -16,9 +18,31 @@ function today() {
   return new Date(t.getFullYear(), t.getMonth(), t.getDate());
 }
 
+function LoadingSpinner() {
+  return (
+    <div className="flex items-center justify-center py-32">
+      <div
+        className="h-10 w-10 animate-spin rounded-full border-[3px]"
+        style={{
+          borderColor: "var(--go-dark-600)",
+          borderTopColor: "var(--go-orange)",
+        }}
+      />
+      <span
+        className="ml-3 font-body text-sm"
+        style={{ color: "var(--go-gray-2)" }}
+      >
+        Cargando datos...
+      </span>
+    </div>
+  );
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState("dashboard");
   const [modalOpen, setModalOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("sidebar-collapsed") === "true"
+  );
 
   const [creators, setCreators] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -30,6 +54,14 @@ export default function App() {
     const t = today();
     return { start: firstOfMonth(t.getFullYear(), t.getMonth()), end: t };
   });
+
+  const handleToggleSidebar = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("sidebar-collapsed", next ? "true" : "false");
+      return next;
+    });
+  };
 
   const loadData = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -60,72 +92,83 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "var(--go-dark-900)" }}>
-      <Navbar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+    <div className="min-h-screen" style={{ background: "var(--go-dark-900)" }}>
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggle={handleToggleSidebar}
         onNewTicket={() => setModalOpen(true)}
       />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
-        {error && (
-          <div
-            className="mb-6 rounded-go border px-4 py-3 font-body text-sm"
-            style={{
-              background: "rgba(229,62,62,0.08)",
-              borderColor: "rgba(229,62,62,0.25)",
-              color: "var(--go-error)",
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {loading ? (
-          <div className="flex items-center justify-center py-32">
+      <main
+        className={`min-h-screen transition-all duration-300 ${
+          sidebarCollapsed ? "ml-16" : "ml-16 sm:ml-60"
+        }`}
+      >
+        <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          {error && (
             <div
-              className="h-10 w-10 animate-spin rounded-full border-[3px]"
+              className="mb-6 rounded-go border px-4 py-3 font-body text-sm"
               style={{
-                borderColor: "var(--go-dark-600)",
-                borderTopColor: "var(--go-orange)",
+                background: "rgba(229,62,62,0.08)",
+                borderColor: "rgba(229,62,62,0.25)",
+                color: "var(--go-error)",
               }}
-            />
-            <span
-              className="ml-3 font-body text-sm"
-              style={{ color: "var(--go-gray-2)" }}
             >
-              Cargando datos...
-            </span>
-          </div>
-        ) : (
-          <>
-            {activeTab === "dashboard" && (
-              <Dashboard
-                kpi={kpi}
-                dateRange={dateRange}
-                onDateRangeChange={(start, end) =>
-                  setDateRange({ start, end })
-                }
-              />
-            )}
-            {activeTab === "creators" && (
-              <CreatorList creators={creators} />
-            )}
-            {activeTab === "transactions" && (
-              <TransactionTable
-                creators={creators}
-                brands={brands}
-              />
-            )}
-            {activeTab === "admin" && (
-              <AdminView
-                creators={creators}
-                brands={brands}
-                onChange={() => loadData({ silent: true })}
-              />
-            )}
-          </>
-        )}
+              {error}
+            </div>
+          )}
+
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route
+              path="/dashboard"
+              element={
+                loading ? (
+                  <LoadingSpinner />
+                ) : (
+                  <Dashboard
+                    kpi={kpi}
+                    dateRange={dateRange}
+                    onDateRangeChange={(start, end) =>
+                      setDateRange({ start, end })
+                    }
+                  />
+                )
+              }
+            />
+            <Route
+              path="/creadores"
+              element={
+                loading ? <LoadingSpinner /> : <CreatorList creators={creators} />
+              }
+            />
+            <Route
+              path="/transacciones"
+              element={
+                loading ? (
+                  <LoadingSpinner />
+                ) : (
+                  <TransactionTable creators={creators} brands={brands} />
+                )
+              }
+            />
+            <Route
+              path="/administracion"
+              element={
+                loading ? (
+                  <LoadingSpinner />
+                ) : (
+                  <AdminView
+                    creators={creators}
+                    brands={brands}
+                    onChange={() => loadData({ silent: true })}
+                  />
+                )
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </div>
       </main>
 
       {modalOpen && (
