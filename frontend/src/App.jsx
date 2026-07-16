@@ -6,8 +6,15 @@ import CreatorList from "./components/CreatorList";
 import TransactionTable from "./components/TransactionTable";
 import AdminView from "./components/AdminView";
 import UploadTicketModal from "./components/UploadTicketModal";
+import ProtectedRoute from "./components/ProtectedRoute";
 import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
+import ProfilePage from "./pages/ProfilePage";
+import ForbiddenPage from "./pages/ForbiddenPage";
+import { useAuth } from "./context/AuthContext";
 import { fetchCreators, fetchCreatorsKpi, fetchBrands } from "./api";
+
+const ADMIN_ROLES = ["admin", "superadmin"];
 
 function firstOfMonth(y, m) {
   return new Date(y, m, 1);
@@ -39,6 +46,25 @@ function LoadingSpinner() {
 }
 
 export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute>
+            <AppShell />
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
+  );
+}
+
+function AppShell() {
+  const { user } = useAuth();
+  const isPrivileged = user && ADMIN_ROLES.includes(user.role);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem("sidebar-collapsed") === "true"
@@ -69,7 +95,7 @@ export default function App() {
     try {
       const [c, k, b] = await Promise.all([
         fetchCreators(),
-        fetchCreatorsKpi(),
+        isPrivileged ? fetchCreatorsKpi() : Promise.resolve(null),
         fetchBrands(false), // incluye marcas inactivas para la vista de administración
       ]);
       setCreators(c);
@@ -80,7 +106,7 @@ export default function App() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [isPrivileged]);
 
   useEffect(() => {
     loadData();
@@ -123,23 +149,27 @@ export default function App() {
             <Route
               path="/dashboard"
               element={
-                loading ? (
-                  <LoadingSpinner />
-                ) : (
-                  <Dashboard
-                    kpi={kpi}
-                    dateRange={dateRange}
-                    onDateRangeChange={(start, end) =>
-                      setDateRange({ start, end })
-                    }
-                  />
-                )
+                <ProtectedRoute roles={ADMIN_ROLES}>
+                  {loading ? (
+                    <LoadingSpinner />
+                  ) : (
+                    <Dashboard
+                      kpi={kpi}
+                      dateRange={dateRange}
+                      onDateRangeChange={(start, end) =>
+                        setDateRange({ start, end })
+                      }
+                    />
+                  )}
+                </ProtectedRoute>
               }
             />
             <Route
               path="/creadores"
               element={
-                loading ? <LoadingSpinner /> : <CreatorList creators={creators} />
+                <ProtectedRoute roles={ADMIN_ROLES}>
+                  {loading ? <LoadingSpinner /> : <CreatorList creators={creators} />}
+                </ProtectedRoute>
               }
             />
             <Route
@@ -155,17 +185,21 @@ export default function App() {
             <Route
               path="/administracion"
               element={
-                loading ? (
-                  <LoadingSpinner />
-                ) : (
-                  <AdminView
-                    creators={creators}
-                    brands={brands}
-                    onChange={() => loadData({ silent: true })}
-                  />
-                )
+                <ProtectedRoute roles={ADMIN_ROLES}>
+                  {loading ? (
+                    <LoadingSpinner />
+                  ) : (
+                    <AdminView
+                      creators={creators}
+                      brands={brands}
+                      onChange={() => loadData({ silent: true })}
+                    />
+                  )}
+                </ProtectedRoute>
               }
             />
+            <Route path="/perfil" element={<ProfilePage />} />
+            <Route path="/403" element={<ForbiddenPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </div>

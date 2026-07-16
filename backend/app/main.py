@@ -4,10 +4,9 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from .database import engine, Base
-from .routers import creators, brands, tickets, dashboard
+from .routers import auth, creators, brands, tickets, dashboard, users
 
 Base.metadata.create_all(bind=engine)
 
@@ -16,14 +15,14 @@ CORS_ORIGINS = os.getenv(
     "http://localhost:5173,http://127.0.0.1:5173",
 ).split(",")
 
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# En producción se deshabilitan /docs y /redoc (Swagger/Redoc quedaban abiertos sin auth).
+IS_PRODUCTION = os.getenv("ENV", "development") == "production"
 
 app = FastAPI(
     title="Control de Presupuestos - Creadores de Contenido",
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
 )
 
 app.add_middleware(
@@ -34,8 +33,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+# El mount estático de /uploads se eliminó: todo comprobante se sirve ahora vía
+# GET /api/tickets/file/{id}, que valida sesión y pertenencia del ticket.
 
+app.include_router(auth.router)
+app.include_router(users.router)
 app.include_router(creators.router)
 app.include_router(brands.router)
 app.include_router(tickets.router)

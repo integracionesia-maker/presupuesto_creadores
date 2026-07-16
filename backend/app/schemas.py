@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class CreatorBase(BaseModel):
@@ -105,3 +105,68 @@ class DashboardSummary(BaseModel):
     ticket_count: int
     avg_ticket: float
     active_brands: int
+
+
+# ── Autenticación ────────────────────────────────────────────────────────────
+
+
+class LoginRequest(BaseModel):
+    identificador: str = Field(..., min_length=1, description="Nombre de usuario o correo")
+    password: str = Field(..., min_length=1)
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    full_name: str
+    role: str
+    creator_id: Optional[int] = None
+    is_active: bool
+    must_change_password: bool
+    last_login: Optional[datetime] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class LoginResponse(BaseModel):
+    user: UserResponse
+
+
+class UpdateProfileRequest(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=1, max_length=150)
+    email: Optional[EmailStr] = None
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=10)
+
+
+# ── Gestión de usuarios (Administración) ────────────────────────────────────
+
+
+class UserCreateRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    email: EmailStr
+    full_name: str = Field(..., min_length=1, max_length=150)
+    role: str
+    password: Optional[str] = Field(None, min_length=10)
+    creator_id: Optional[int] = None
+
+
+class UserUpdateRequest(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=1, max_length=150)
+    email: Optional[EmailStr] = None
+    role: Optional[str] = None
+    creator_id: Optional[int] = None
+
+
+class SetUserActiveRequest(BaseModel):
+    is_active: bool
+    confirm_username: Optional[str] = None
+
+
+class ResetPasswordResponse(BaseModel):
+    temporary_password: str

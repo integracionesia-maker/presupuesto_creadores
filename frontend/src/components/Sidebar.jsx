@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const NAV_ITEMS = [
   {
@@ -6,33 +7,66 @@ const NAV_ITEMS = [
     end: true,
     label: "Inicio",
     icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
+    roles: null,
   },
   {
     to: "/dashboard",
     label: "Dashboard",
     icon: "M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm12 0a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z",
+    roles: ["admin", "superadmin"],
   },
   {
     to: "/creadores",
     label: "Creadores",
     icon: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z",
+    roles: ["admin", "superadmin"],
   },
   {
     to: "/transacciones",
     label: "Transacciones",
     icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+    roles: null,
   },
   {
     to: "/administracion",
     label: "Administración",
     icon: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z",
+    roles: ["admin", "superadmin"],
   },
 ];
 
+const PROFILE_ITEM = {
+  to: "/perfil",
+  label: "Mi Perfil",
+  icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
+};
+
+const ROLE_LABELS = {
+  superadmin: "Superadministrador",
+  admin: "Administrador",
+  creador: "Creador",
+};
+
+function initials(fullName) {
+  if (!fullName) return "?";
+  return fullName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join("");
+}
+
 export default function Sidebar({ collapsed, onToggle, onNewTicket }) {
+  const { user, logout } = useAuth();
+
   /* En <640px siempre se muestra angosto (solo íconos); el toggle aplica ≥sm */
   const widthClass = collapsed ? "w-16" : "w-16 sm:w-60";
   const labelClass = collapsed ? "hidden" : "hidden sm:inline";
+
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.roles || (user && item.roles.includes(user.role))
+  );
 
   return (
     <aside
@@ -71,7 +105,7 @@ export default function Sidebar({ collapsed, onToggle, onNewTicket }) {
 
       {/* ── Navigation ────────────────────────────────────────────────── */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-2.5 py-4">
-        {NAV_ITEMS.map((item) => (
+        {visibleItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -95,7 +129,75 @@ export default function Sidebar({ collapsed, onToggle, onNewTicket }) {
             <span className={`${labelClass} truncate`}>{item.label}</span>
           </NavLink>
         ))}
+
+        <NavLink
+          to={PROFILE_ITEM.to}
+          title={PROFILE_ITEM.label}
+          className="flex items-center gap-3 rounded-go px-3 py-2.5 font-display text-sm font-semibold tracking-wide transition-all duration-200"
+          style={({ isActive }) => ({
+            background: isActive ? "var(--go-dark-600)" : "transparent",
+            color: isActive ? "var(--go-orange)" : "var(--go-gray-2)",
+          })}
+        >
+          <svg
+            className="h-5 w-5 flex-shrink-0"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.7}
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d={PROFILE_ITEM.icon} />
+          </svg>
+          <span className={`${labelClass} truncate`}>{PROFILE_ITEM.label}</span>
+        </NavLink>
       </nav>
+
+      {/* ── Usuario logueado ──────────────────────────────────────────── */}
+      {user && (
+        <div
+          className="border-t px-2.5 py-3"
+          style={{ borderColor: "var(--go-dark-600)" }}
+          title={`${user.full_name} — ${ROLE_LABELS[user.role] || user.role}`}
+        >
+          <div className="flex items-center gap-2.5">
+            <div
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full font-display text-xs font-bold"
+              style={{ background: "var(--go-dark-600)", color: "var(--go-orange)" }}
+            >
+              {initials(user.full_name)}
+            </div>
+            <div className={`${labelClass} min-w-0`}>
+              <p
+                className="truncate font-display text-xs font-semibold"
+                style={{ color: "var(--go-white)" }}
+              >
+                {user.full_name}
+              </p>
+              <p className="truncate font-body text-[10px]" style={{ color: "var(--go-gray-2)" }}>
+                {ROLE_LABELS[user.role] || user.role}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cerrar sesión ─────────────────────────────────────────────── */}
+      <div className="px-2.5 pb-3">
+        <button
+          onClick={() => logout()}
+          title="Cerrar sesión"
+          className={`btn-go-ghost w-full ${collapsed ? "justify-center px-0" : "justify-center px-0 sm:justify-start sm:px-5"}`}
+        >
+          <svg className="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+            />
+          </svg>
+          <span className={labelClass}>Cerrar sesión</span>
+        </button>
+      </div>
 
       {/* ── Nuevo Ticket ──────────────────────────────────────────────── */}
       <div className="px-2.5 pb-3">

@@ -1,5 +1,6 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { uploadTicket } from "../api";
+import { useAuth } from "../context/AuthContext";
 
 const ALLOWED_EXTS = [".jpg", ".jpeg", ".png", ".pdf"];
 const ALLOWED_MIME = [
@@ -23,6 +24,9 @@ export default function UploadTicketModal({
   onClose,
   onSuccess,
 }) {
+  const { user } = useAuth();
+  const isCreador = user?.role === "creador";
+
   const [creatorId, setCreatorId] = useState("");
   const [brandId, setBrandId] = useState("");
   const [amount, setAmount] = useState("");
@@ -44,6 +48,13 @@ export default function UploadTicketModal({
   const selectedCreator = activeCreators.find(
     (c) => c.id === Number(creatorId)
   );
+
+  /* Un creador solo registra tickets a su propio nombre: preseleccionado y bloqueado. */
+  useEffect(() => {
+    if (isCreador && !creatorId && activeCreators.length > 0) {
+      setCreatorId(String(activeCreators[0].id));
+    }
+  }, [isCreador, creatorId, activeCreators]);
 
   /* ── File validation ─────────────────────────────────────────────────── */
 
@@ -187,8 +198,9 @@ export default function UploadTicketModal({
               onChange={(e) => setCreatorId(e.target.value)}
               className="go-select"
               required
+              disabled={isCreador}
             >
-              <option value="">Seleccionar creador...</option>
+              {!isCreador && <option value="">Seleccionar creador...</option>}
               {activeCreators.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name} — Restante: {formatCurrency(c.remaining_budget)}

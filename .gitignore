@@ -27,6 +27,11 @@ node_modules/
 .vite/
 .vite-temp/
 
+# ── Playwright (E2E) ──────────────────────────────────────
+test-results/
+playwright-report/
+blob-report/
+
 # ── Sistema operativo ─────────────────────────────────────
 Thumbs.db
 .DS_Store

@@ -1,0 +1,171 @@
+"""Configuración compartida de pytest: DB de pruebas aislada (nunca la real),
+fixtures de usuarios por rol y helpers de login.
+"""
+
+import os
+from pathlib import Path
+
+TEST_DB_PATH = Path(__file__).parent / "test_auth.db"
+os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH}"
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-0123456789abcdef")
+os.environ.setdefault("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "15")
+os.environ.setdefault("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7")
+os.environ.setdefault("ENV", "development")
+os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app import models, security
+from app.database import Base, SessionLocal, engine
+from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def _clean_state():
+    """Cada test arranca con tablas vacías y sin historial de rate limiting."""
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    security._login_attempts_by_ip.clear()
+    yield
+
+
+@pytest.fixture
+def db():
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+@pytest.fixture
+def client():
+    return TestClient(app)
+
+
+def make_user(
+    db,
+    *,
+    username,
+    password,
+    role,
+    email=None,
+    full_name=None,
+    creator_id=None,
+    must_change_password=False,
+    is_active=True,
+):
+    user = models.User(
+        username=username,
+        email=email or f"{username}@test.com",
+        password_hash=security.hash_password(password),
+        full_name=full_name or username,
+        role=role,
+        creator_id=creator_id,
+        must_change_password=must_change_password,
+        is_active=is_active,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def make_creator(db, *, name="Creador Test", initial_budget=10_000.0):
+    creator = models.Creator(name=name, initial_budget=initial_budget, remaining_budget=initial_budget)
+    db.add(creator)
+    db.commit()
+    db.refresh(creator)
+    return creator
+
+
+def make_brand(db, *, name="Marca Test"):
+    brand = models.Brand(name=name)
+    db.add(brand)
+    db.commit()
+    db.refresh(brand)
+    return brand
+
+
+def make_ticket(db, *, creator, brand, amount=100.0):
+    from app import crud
+
+    return crud.create_ticket_transactional(
+        db=db,
+        creator=creator,
+        brand=brand,
+        amount=amount,
+        file_name="comprobante.pdf",
+        file_path=str(Path(__file__).parent / "fixtures_dummy.pdf"),
+        mime_type="application/pdf",
+        notes=None,
+    )
+
+
+def login(client, identificador, password):
+    return client.post("/api/auth/login", json={"identificador": identificador, "password": password})
+
+
+PASSWORD_SUPERADMIN = "SuperClaveTest123!"
+PASSWORD_ADMIN = "AdminClaveTest123!"
+PASSWORD_CREADOR = "CreadorClaveTest123!"
+
+
+@pytest.fixture
+def creator_a(db):
+    return make_creator(db, name="Creador A", initial_budget=10_000.0)
+
+
+@pytest.fixture
+def creator_b(db):
+    return make_creator(db, name="Creador B", initial_budget=20_000.0)
+
+
+@pytest.fixture
+def brand_a(db):
+    return make_brand(db, name="Marca A")
+
+
+@pytest.fixture
+def superadmin_user(db):
+    return make_user(db, username="superadmin", password=PASSWORD_SUPERADMIN, role="superadmin")
+
+
+@pytest.fixture
+def admin_user(db):
+    return make_user(db, username="admin1", password=PASSWORD_ADMIN, role="admin")
+
+
+@pytest.fixture
+def creador_user(db, creator_a):
+    return make_user(db, username="creador.a", password=PASSWORD_CREADOR, role="creador", creator_id=creator_a.id)
+
+
+@pytest.fixture
+def creador_user_b(db, creator_b):
+    return make_user(db, username="creador.b", password=PASSWORD_CREADOR, role="creador", creator_id=creator_b.id)
+
+
+@pytest.fixture
+def logged_in_superadmin(client, superadmin_user):
+    login(client, "superadmin", PASSWORD_SUPERADMIN)
+    return client
+
+
+@pytest.fixture
+def logged_in_admin(client, admin_user):
+    login(client, "admin1", PASSWORD_ADMIN)
+    return client
+
+
+@pytest.fixture
+def logged_in_creador(client, creador_user):
+    login(client, "creador.a", PASSWORD_CREADOR)
+    return client
+
+
+@pytest.fixture
+def logged_in_creador_b(client, creador_user_b):
+    login(client, "creador.b", PASSWORD_CREADOR)
+    return client

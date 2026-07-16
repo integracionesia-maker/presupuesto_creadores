@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createCreator, updateCreator, createBrand, updateBrand } from "../api";
 import Modal from "./Modal";
+import UserManagement from "./UserManagement";
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat("es-MX", {
@@ -13,6 +14,7 @@ function formatCurrency(amount) {
 const SECTIONS = [
   { key: "creators", label: "Creadores" },
   { key: "brands", label: "Marcas" },
+  { key: "users", label: "Usuarios" },
 ];
 
 export default function AdminView({ creators, brands, onChange }) {
@@ -429,6 +431,9 @@ export default function AdminView({ creators, brands, onChange }) {
           )}
         </div>
       )}
+
+      {/* ── Users section ──────────────────────────────────────────────── */}
+      {section === "users" && <UserManagement creators={creators} />}
 
       {/* ── Creator create/edit modal ──────────────────────────────────── */}
       {creatorFormOpen && (

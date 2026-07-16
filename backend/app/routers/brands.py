@@ -6,19 +6,28 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .. import crud, schemas
+from .. import crud, models, schemas
 from ..database import get_db
+from ..dependencies import get_current_user, require_role
 
 router = APIRouter(prefix="/api/brands", tags=["brands"])
 
 
 @router.get("/", response_model=List[schemas.BrandResponse])
-def list_brands(active_only: bool = False, db: Session = Depends(get_db)):
+def list_brands(
+    active_only: bool = False,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     return crud.get_brands(db, active_only=active_only)
 
 
 @router.get("/{brand_id}", response_model=schemas.BrandResponse)
-def get_brand(brand_id: int, db: Session = Depends(get_db)):
+def get_brand(
+    brand_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     brand = crud.get_brand(db, brand_id)
     if not brand:
         raise HTTPException(status_code=404, detail="Marca no encontrada.")
@@ -26,7 +35,11 @@ def get_brand(brand_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=schemas.BrandResponse, status_code=201)
-def create_brand(data: schemas.BrandCreate, db: Session = Depends(get_db)):
+def create_brand(
+    data: schemas.BrandCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin", "superadmin")),
+):
     try:
         return crud.create_brand(db, data)
     except IntegrityError:
@@ -35,7 +48,12 @@ def create_brand(data: schemas.BrandCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{brand_id}", response_model=schemas.BrandResponse)
-def update_brand(brand_id: int, data: schemas.BrandUpdate, db: Session = Depends(get_db)):
+def update_brand(
+    brand_id: int,
+    data: schemas.BrandUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin", "superadmin")),
+):
     brand = crud.get_brand(db, brand_id)
     if not brand:
         raise HTTPException(status_code=404, detail="Marca no encontrada.")

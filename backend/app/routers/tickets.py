@@ -7,8 +7,9 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile, 
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from .. import crud, schemas
+from .. import crud, models, schemas
 from ..database import get_db, SessionLocal
+from ..dependencies import get_current_user, require_role
 from ..upload_manager import save_upload, delete_upload
 
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
@@ -19,8 +20,14 @@ def list_tickets(
     creator_name: Optional[str] = None,
     brand_name: Optional[str] = None,
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
 ):
-    tickets = crud.get_tickets(db, creator_name=creator_name, brand_name=brand_name)
+    if current_user.role == "creador":
+        # Se ignora cualquier filtro por nombre de creador: un creador solo ve lo suyo.
+        tickets = crud.get_tickets(db, creator_name=None, brand_name=brand_name)
+        tickets = [t for t in tickets if t.creator_id == current_user.creator_id]
+    else:
+        tickets = crud.get_tickets(db, creator_name=creator_name, brand_name=brand_name)
     result: List[schemas.TicketResponse] = []
     for t in tickets:
         result.append(
@@ -46,15 +53,22 @@ def brand_spend_breakdown(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin", "superadmin")),
 ):
     return crud.get_brand_spend_breakdown(db, start_date=start_date, end_date=end_date)
 
 
 @router.get("/file/{ticket_id}")
-def download_file(ticket_id: int, db: Session = Depends(get_db)):
+def download_file(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     ticket = crud.get_ticket(db, ticket_id)
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket no encontrado.")
+    if current_user.role == "creador" and ticket.creator_id != current_user.creator_id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para esta acción.")
     return FileResponse(path=ticket.file_path, media_type=ticket.mime_type, filename=ticket.file_name)
 
 
@@ -65,7 +79,11 @@ def create_ticket(
     amount: float = Form(..., gt=0),
     notes: Optional[str] = Form(None),
     file: UploadFile = File(...),
+    current_user: models.User = Depends(get_current_user),
 ):
+    if current_user.role == "creador" and creator_id != current_user.creator_id:
+        raise HTTPException(status_code=403, detail="No tienes permiso para esta acción.")
+
     db: Session = SessionLocal()
     file_path_on_disk: Optional[str] = None
 

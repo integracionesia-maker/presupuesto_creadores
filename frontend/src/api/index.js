@@ -1,12 +1,47 @@
 /**
  * Thin API wrapper around the FastAPI backend.
  * All calls return parsed JSON; errors throw with a descriptive message.
+ * Cookies de sesión (access/refresh) viajan en cada request; un 401 dispara
+ * un intento de refresh automático y reintenta la petición original una vez.
  */
 
 const BASE = "/api";
+const NO_RETRY_PATHS = ["/auth/login", "/auth/refresh"];
+
+let onAuthFailure = null;
+export function setAuthFailureHandler(handler) {
+  onAuthFailure = handler;
+}
+
+let refreshPromise = null;
+function refreshSession() {
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${BASE}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    }).finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
+
+async function fetchWithAuthRetry(path, options = {}, skipAuthRetry = false) {
+  const res = await fetch(`${BASE}${path}`, { credentials: "include", ...options });
+
+  if (res.status === 401 && !skipAuthRetry && !NO_RETRY_PATHS.some((p) => path.startsWith(p))) {
+    const refreshRes = await refreshSession();
+    if (refreshRes.ok) {
+      return fetchWithAuthRetry(path, options, true);
+    }
+    if (onAuthFailure) onAuthFailure();
+  }
+
+  return res;
+}
 
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetchWithAuthRetry(path, {
     headers: { "Content-Type": "application/json", ...options.headers },
     ...options,
   });
@@ -17,6 +52,60 @@ async function request(path, options = {}) {
   }
 
   return res.json();
+}
+
+/* ── Auth ────────────────────────────────────────────────────────────────── */
+
+export function login(identificador, password) {
+  return request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ identificador, password }),
+  });
+}
+
+export function logout() {
+  return request("/auth/logout", { method: "POST" });
+}
+
+export function fetchMe() {
+  return request("/auth/me");
+}
+
+export function updateMe(data) {
+  return request("/auth/me", { method: "PUT", body: JSON.stringify(data) });
+}
+
+export function changePassword(currentPassword, newPassword) {
+  return request("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+}
+
+/* ── Usuarios (Administración) ──────────────────────────────────────────── */
+
+export function fetchUsers(role) {
+  const qs = role ? `?role=${role}` : "";
+  return request(`/users/${qs}`);
+}
+
+export function createUser(data) {
+  return request("/users/", { method: "POST", body: JSON.stringify(data) });
+}
+
+export function updateUser(id, data) {
+  return request(`/users/${id}`, { method: "PUT", body: JSON.stringify(data) });
+}
+
+export function resetUserPassword(id) {
+  return request(`/users/${id}/reset-password`, { method: "POST" });
+}
+
+export function setUserActive(id, isActive, confirmUsername) {
+  return request(`/users/${id}/estado`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_active: isActive, confirm_username: confirmUsername || null }),
+  });
 }
 
 /* ── Creators ────────────────────────────────────────────────────────────── */
@@ -91,7 +180,7 @@ export async function uploadTicket({ creatorId, brandId, amount, notes, file }) 
   if (notes) formData.append("notes", notes);
   formData.append("file", file);
 
-  const res = await fetch(`${BASE}/tickets/`, {
+  const res = await fetchWithAuthRetry("/tickets/", {
     method: "POST",
     body: formData,
   });

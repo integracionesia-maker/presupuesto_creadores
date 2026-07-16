@@ -6,8 +6,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from .. import crud, schemas
+from .. import crud, models, schemas
 from ..database import get_db
+from ..dependencies import require_role
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -17,6 +18,7 @@ def dashboard_summary(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin", "superadmin")),
 ):
     return crud.get_dashboard_summary(db, start_date=start_date, end_date=end_date)
 
@@ -26,6 +28,7 @@ def monthly_spend(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin", "superadmin")),
 ):
     return crud.get_monthly_spend(db, start_date=start_date, end_date=end_date)
 
@@ -35,5 +38,6 @@ def creator_usage(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin", "superadmin")),
 ):
     return crud.get_creator_usage(db, start_date=start_date, end_date=end_date)

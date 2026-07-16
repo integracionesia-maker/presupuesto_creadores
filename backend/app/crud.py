@@ -1,6 +1,6 @@
 """CRUD helper functions used by API routers."""
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
@@ -274,3 +274,197 @@ def get_dashboard_summary(
         avg_ticket=round(avg_ticket, 2),
         active_brands=active_brands,
     )
+
+
+# ── Usuarios ─────────────────────────────────────────────────────────────────
+
+MAX_FAILED_LOGIN_ATTEMPTS = 5
+BASE_LOCK_MINUTES = 5
+MAX_LOCK_MINUTES = 60
+
+
+def get_user(db: Session, user_id: int) -> Optional[models.User]:
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
+
+def get_user_by_username(db: Session, username: str) -> Optional[models.User]:
+    return db.query(models.User).filter(models.User.username == username).first()
+
+
+def get_user_by_email(db: Session, email: str) -> Optional[models.User]:
+    return db.query(models.User).filter(models.User.email == email).first()
+
+
+def get_user_by_identifier(db: Session, identifier: str) -> Optional[models.User]:
+    return get_user_by_username(db, identifier) or get_user_by_email(db, identifier)
+
+
+def list_users(db: Session, role: Optional[str] = None) -> List[models.User]:
+    q = db.query(models.User)
+    if role:
+        q = q.filter(models.User.role == role)
+    return q.order_by(models.User.username).all()
+
+
+def create_user(
+    db: Session,
+    *,
+    username: str,
+    email: str,
+    password_hash: str,
+    full_name: str,
+    role: str,
+    creator_id: Optional[int] = None,
+    must_change_password: bool = True,
+) -> models.User:
+    user = models.User(
+        username=username,
+        email=email,
+        password_hash=password_hash,
+        full_name=full_name,
+        role=role,
+        creator_id=creator_id,
+        must_change_password=must_change_password,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def update_user_profile(
+    db: Session, user: models.User, full_name: Optional[str], email: Optional[str]
+) -> models.User:
+    if full_name is not None:
+        user.full_name = full_name
+    if email is not None:
+        user.email = email
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def update_user_admin(db: Session, user: models.User, update_data: dict) -> models.User:
+    for field, value in update_data.items():
+        setattr(user, field, value)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def set_user_password(
+    db: Session, user: models.User, password_hash: str, must_change_password: bool
+) -> models.User:
+    user.password_hash = password_hash
+    user.must_change_password = must_change_password
+    user.token_version += 1
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def set_user_active(db: Session, user: models.User, is_active: bool) -> models.User:
+    user.is_active = is_active
+    if not is_active:
+        user.token_version += 1
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def is_locked(user: models.User) -> bool:
+    # Naive UTC: SQLite devuelve locked_until sin tzinfo; ambos lados deben coincidir.
+    return user.locked_until is not None and user.locked_until > datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def register_failed_login(db: Session, user: models.User) -> None:
+    user.failed_login_attempts += 1
+    if user.failed_login_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
+        extra = user.failed_login_attempts - MAX_FAILED_LOGIN_ATTEMPTS
+        lock_minutes = min(BASE_LOCK_MINUTES * (2 ** extra), MAX_LOCK_MINUTES)
+        user.locked_until = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=lock_minutes)
+    db.commit()
+
+
+def register_successful_login(db: Session, user: models.User) -> None:
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.last_login = datetime.now(timezone.utc)
+    db.commit()
+
+
+# ── Refresh tokens ───────────────────────────────────────────────────────────
+
+def create_refresh_token_record(
+    db: Session, user_id: int, token_hash: str, expires_at: datetime
+) -> models.RefreshToken:
+    rt = models.RefreshToken(user_id=user_id, token_hash=token_hash, expires_at=expires_at)
+    db.add(rt)
+    db.commit()
+    db.refresh(rt)
+    return rt
+
+
+def get_refresh_token_by_hash(db: Session, token_hash: str) -> Optional[models.RefreshToken]:
+    return (
+        db.query(models.RefreshToken)
+        .filter(models.RefreshToken.token_hash == token_hash)
+        .first()
+    )
+
+
+def rotate_refresh_token(
+    db: Session, old_token: models.RefreshToken, new_token_hash: str, new_expires_at: datetime
+) -> models.RefreshToken:
+    new_rt = models.RefreshToken(
+        user_id=old_token.user_id, token_hash=new_token_hash, expires_at=new_expires_at
+    )
+    db.add(new_rt)
+    db.flush()
+    old_token.revoked_at = datetime.now(timezone.utc)
+    old_token.replaced_by_id = new_rt.id
+    db.commit()
+    db.refresh(new_rt)
+    return new_rt
+
+
+def revoke_refresh_token(db: Session, token: models.RefreshToken) -> None:
+    token.revoked_at = datetime.now(timezone.utc)
+    db.commit()
+
+
+def revoke_all_refresh_tokens_for_user(db: Session, user_id: int) -> None:
+    now = datetime.now(timezone.utc)
+    (
+        db.query(models.RefreshToken)
+        .filter(
+            models.RefreshToken.user_id == user_id,
+            models.RefreshToken.revoked_at.is_(None),
+        )
+        .update({"revoked_at": now}, synchronize_session=False)
+    )
+    db.commit()
+
+
+# ── Auditoría ────────────────────────────────────────────────────────────────
+
+def log_audit(
+    db: Session,
+    *,
+    action: str,
+    actor_user_id: Optional[int] = None,
+    target_type: Optional[str] = None,
+    target_id: Optional[int] = None,
+    details: Optional[str] = None,
+    ip_address: Optional[str] = None,
+) -> None:
+    entry = models.AuditLog(
+        actor_user_id=actor_user_id,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        details=details,
+        ip_address=ip_address,
+    )
+    db.add(entry)
+    db.commit()
