@@ -1,0 +1,218 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Grupo Ortiz — Design Tokens
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --go-orange: #fb670b;
+  --go-orange-hover: #ff7a22;
+  --go-orange-pressed: #d95c00;
+  --go-orange-tint: rgba(251, 103, 11, 0.1);
+
+  --go-black: #262626;
+  --go-gray-1: #535353;
+  --go-gray-2: #c5c5c5;
+  --go-cream: #ecebe0;
+  --go-white: #ffffff;
+
+  --go-dark-900: #09090b;
+  --go-dark-800: #111113;
+  --go-dark-700: #18181b;
+  --go-dark-600: #27272a;
+
+  --go-error: #e53e3e;
+  --go-success: #00a36e;
+  --go-warning: #f59e0b;
+
+  --go-font-display: "Space Grotesk", sans-serif;
+  --go-font-body: "Inter", sans-serif;
+  --go-font-mono: "JetBrains Mono", monospace;
+
+  --go-radius: 8px;
+  --go-radius-lg: 12px;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-go-dark-900 font-body text-gray-200 antialiased;
+  }
+
+  /* Firefox scrollbar */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #27272a #09090b;
+  }
+
+  /* Chrome/Edge scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #09090b;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #27272a;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #535353;
+  }
+}
+
+@layer components {
+  /* ── GO button primary ────────────────────────────────────────────── */
+  .btn-go {
+    @apply inline-flex items-center gap-2 rounded-go px-5 py-2.5
+           font-display text-sm font-bold tracking-wide
+           text-white transition-colors duration-200;
+    background: var(--go-orange);
+    letter-spacing: 0.04em;
+  }
+  .btn-go:hover {
+    background: var(--go-orange-hover);
+  }
+  .btn-go:active {
+    background: var(--go-orange-pressed);
+  }
+  .btn-go:disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* ── GO button ghost ──────────────────────────────────────────────── */
+  .btn-go-ghost {
+    @apply inline-flex items-center gap-2 rounded-go border px-4 py-2
+           font-display text-sm font-semibold transition-all duration-200;
+    border-color: var(--go-gray-2);
+    color: var(--go-gray-2);
+    background: transparent;
+  }
+  .btn-go-ghost:hover {
+    border-color: var(--go-orange);
+    color: var(--go-orange);
+  }
+
+  /* ── GO card ──────────────────────────────────────────────────────── */
+  .go-card {
+    @apply rounded-go-lg border p-6;
+    background: var(--go-dark-700);
+    border-color: var(--go-dark-600);
+  }
+
+  /* ── GO input ─────────────────────────────────────────────────────── */
+  .go-input {
+    @apply w-full rounded-go border px-3.5 py-2.5 font-body text-sm
+           transition-all duration-200;
+    background: var(--go-dark-600);
+    border-color: var(--go-dark-600);
+    color: #e5e5e5;
+  }
+  .go-input::placeholder {
+    color: #6b7280;
+  }
+  .go-input:focus {
+    @apply outline-none;
+    border-color: var(--go-orange);
+    box-shadow: 0 0 0 3px var(--go-orange-tint);
+  }
+
+  /* ── GO select ────────────────────────────────────────────────────── */
+  .go-select {
+    @apply w-full rounded-go border px-3.5 py-2.5 font-body text-sm
+           transition-all duration-200 appearance-none;
+    background: var(--go-dark-600);
+    border-color: var(--go-dark-600);
+    color: #e5e5e5;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='m2 4 4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 2.5rem;
+  }
+  .go-select:focus {
+    @apply outline-none;
+    border-color: var(--go-orange);
+    box-shadow: 0 0 0 3px var(--go-orange-tint);
+  }
+
+  /* ── GO badge ─────────────────────────────────────────────────────── */
+  .go-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1
+           font-display text-[11px] font-bold uppercase tracking-widest;
+    letter-spacing: 0.08em;
+  }
+  .go-badge-success {
+    background: rgba(0, 163, 110, 0.12);
+    color: #00a36e;
+    border: 1px solid rgba(0, 163, 110, 0.25);
+  }
+  .go-badge-warning {
+    background: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+  }
+  .go-badge-error {
+    background: rgba(229, 62, 62, 0.12);
+    color: #e53e3e;
+    border: 1px solid rgba(229, 62, 62, 0.25);
+  }
+
+  /* ── GO eyebrow label ─────────────────────────────────────────────── */
+  .go-eyebrow {
+    @apply font-display text-[11px] font-bold uppercase tracking-[0.14em];
+    color: var(--go-orange);
+  }
+
+  /* ── GO table ─────────────────────────────────────────────────────── */
+  .go-table {
+    @apply w-full font-body text-sm;
+    border-collapse: collapse;
+  }
+  .go-table thead tr {
+    border-bottom: 2px solid var(--go-orange);
+  }
+  .go-table thead th {
+    @apply px-3 py-3 text-left font-display text-[11px] font-bold
+           uppercase tracking-[0.10em];
+    color: var(--go-gray-2);
+  }
+  .go-table tbody tr {
+    border-bottom: 1px solid var(--go-dark-600);
+    transition: background 150ms;
+  }
+  .go-table tbody tr:hover {
+    background: rgba(251, 103, 11, 0.04);
+  }
+  .go-table tbody td {
+    @apply px-3 py-3 align-middle;
+    color: #d4d4d4;
+  }
+  .go-table td.num {
+    font-family: var(--go-font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Dark date inputs ─────────────────────────────────────────────── */
+  input[type="date"] {
+    color-scheme: dark;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.7);
+    cursor: pointer;
+  }
+  input[type="date"]::-webkit-datetime-edit-text,
+  input[type="date"]::-webkit-datetime-edit-month-field,
+  input[type="date"]::-webkit-datetime-edit-day-field,
+  input[type="date"]::-webkit-datetime-edit-year-field {
+    color: #e5e5e5;
+  }
+}

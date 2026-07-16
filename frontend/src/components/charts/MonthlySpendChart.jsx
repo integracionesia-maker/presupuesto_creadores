@@ -1,0 +1,71 @@
+import { useMemo } from "react";
+import Chart from "react-apexcharts";
+import { createApexOptions, formatChartCurrency, GO_CHART_COLORS } from "./apexTheme";
+
+const MONTHS_ES = [
+  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+];
+
+function monthLabel(ym) {
+  if (!ym) return "";
+  const [y, m] = ym.split("-");
+  return `${MONTHS_ES[parseInt(m, 10) - 1]} ${y}`;
+}
+
+export default function MonthlySpendChart({ data }) {
+  const options = useMemo(() => {
+    return createApexOptions({
+      chart: {
+        type: "bar",
+        toolbar: { show: true, tools: { download: true, selection: false, zoom: false, zoomin: false, zoomout: false, pan: false, reset: false } },
+      },
+      xaxis: {
+        categories: (data || []).map((d) => monthLabel(d.month)),
+        title: { text: "Mes", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-gray-2)" } },
+      },
+      yaxis: {
+        title: { text: "Monto (MXN)", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-gray-2)" } },
+        labels: { formatter: formatChartCurrency },
+      },
+      plotOptions: {
+        bar: {
+          borderRadius: 4,
+          columnWidth: "55%",
+          dataLabels: { position: "top" },
+        },
+      },
+      dataLabels: {
+        enabled: true,
+        formatter: formatChartCurrency,
+        offsetY: -20,
+        style: { fontSize: "10px", colors: ["var(--go-gray-2)"] },
+      },
+      tooltip: {
+        y: { formatter: (v) => `$${v.toLocaleString("es-MX", { minimumFractionDigits: 2 })}` },
+      },
+      colors: [GO_CHART_COLORS[1]], // turquoise
+    });
+  }, [data]);
+
+  const series = useMemo(() => {
+    return [
+      {
+        name: "Gasto",
+        data: (data || []).map((d) => d.total),
+      },
+    ];
+  }, [data]);
+
+  if (!data || data.length === 0) {
+    return (
+      <p className="py-10 text-center font-body text-sm" style={{ color: "var(--go-gray-2)" }}>
+        Sin transacciones en este período.
+      </p>
+    );
+  }
+
+  return (
+    <Chart options={options} series={series} type="bar" height={320} width="100%" />
+  );
+}

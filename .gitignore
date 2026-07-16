@@ -1,0 +1,40 @@
+# ── Base de datos ──────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── Variables de entorno ──────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Archivos subidos por usuarios ─────────────────────────
+uploads/
+
+# ── Python ────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# ── Node / Frontend ───────────────────────────────────────
+node_modules/
+.vite/
+.vite-temp/
+
+# ── Sistema operativo ─────────────────────────────────────
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# ── IDE ───────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
