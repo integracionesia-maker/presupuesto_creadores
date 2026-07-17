@@ -1,5 +1,6 @@
 import ProfilePopover from "./ProfilePopover";
 import ThemeToggle from "./ThemeToggle";
+import BrandLogo from "./BrandLogo";
 
 /** Barra superior fija global (R1): logo + Grupo Ortiz, hamburguesa en móvil
  * (abre el drawer del Sidebar, R3), toggle de tema y popover de perfil. */
@@ -21,12 +22,7 @@ export default function Header({ onOpenMobileMenu }) {
           </svg>
         </button>
 
-        <div
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-go font-display text-sm font-bold text-white"
-          style={{ background: "var(--go-orange)" }}
-        >
-          GO
-        </div>
+        <BrandLogo variant="isotipo" className="h-8 w-auto flex-shrink-0" />
         <div className="hidden min-w-0 sm:block">
           <h1 className="truncate font-display text-sm font-bold uppercase tracking-[0.08em]" style={{ color: "var(--go-text-primary)" }}>
             Grupo Ortiz

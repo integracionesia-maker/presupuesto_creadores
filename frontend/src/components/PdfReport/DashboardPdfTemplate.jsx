@@ -4,6 +4,7 @@ import BrandSpendApexChart from "../charts/BrandSpendApexChart";
 import SpendTrendChart from "../charts/SpendTrendChart";
 import KpiCard from "../KpiCard";
 import { PRIORITY_LABELS, sortByPriority } from "../../utils/priority";
+import isotipoNaranja from "../../assets/logos/isotipo-go-naranja.png";
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat("es-MX", {
@@ -67,23 +68,11 @@ export default function DashboardPdfTemplate({
       {/* ── Sección 1: encabezado + KPIs ────────────────────────────────── */}
       <div className="pdf-section" style={SECTION_STYLE}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "6px" }}>
-          <div
-            style={{
-              width: "36px",
-              height: "36px",
-              borderRadius: "8px",
-              background: "#FB670B",
-              color: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontWeight: 700,
-              fontSize: "14px",
-            }}
-          >
-            GO
-          </div>
+          <img
+            src={isotipoNaranja}
+            alt="Grupo Ortiz"
+            style={{ height: "36px", width: "auto", display: "block" }}
+          />
           <div>
             <h1
               className="font-display"

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import BrandLogo from "../components/BrandLogo";
 
 export default function LoginPage() {
   const { user, loading, login } = useAuth();
@@ -39,12 +40,7 @@ export default function LoginPage() {
     >
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div
-            className="flex h-14 w-14 items-center justify-center rounded-go-lg font-display text-lg font-bold text-white"
-            style={{ background: "var(--go-orange)" }}
-          >
-            GO
-          </div>
+          <BrandLogo variant="imagotipo" className="h-28 w-auto" />
           <div className="text-center">
             <h1
               className="font-display text-lg font-bold uppercase tracking-[0.06em]"
