@@ -155,7 +155,15 @@ function AppShell() {
           )}
 
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route
+              path="/"
+              element={
+                <HomePage
+                  creators={creators}
+                  onNewTicket={() => setModalOpen(true)}
+                />
+              }
+            />
             <Route
               path="/dashboard"
               element={
