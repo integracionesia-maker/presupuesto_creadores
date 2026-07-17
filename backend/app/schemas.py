@@ -1,32 +1,40 @@
 """Pydantic schemas for request/response validation."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
 
-class CreatorBase(BaseModel):
+class CreatorCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    initial_budget: float = Field(..., gt=0)
-
-
-class CreatorCreate(CreatorBase):
-    pass
+    cycle_budget_amount: float = Field(..., gt=0, description="Monto del ciclo (semanal/mensual)")
+    cycle_period: str = Field(..., description="'semanal' o 'mensual'")
+    initial_budget: float = Field(0.0, ge=0, description="Histórico acumulado, opcional")
 
 
 class CreatorUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
-    initial_budget: Optional[float] = Field(None, gt=0)
+    initial_budget: Optional[float] = Field(None, ge=0)
     is_active: Optional[bool] = None
+    cycle_budget_amount: Optional[float] = Field(None, gt=0)
+    cycle_period: Optional[str] = None
 
 
-class CreatorResponse(CreatorBase):
+class CreatorResponse(BaseModel):
     id: int
+    name: str
+    initial_budget: float
     spent_budget: float
     remaining_budget: float
     is_active: bool
     created_at: datetime
+    cycle_period: Optional[str] = None
+    cycle_amount: Optional[float] = None
+    cycle_spent: Optional[float] = None
+    cycle_remaining: Optional[float] = None
+    cycle_start_date: Optional[date] = None
+    cycle_end_date: Optional[date] = None
 
     model_config = {"from_attributes": True}
 
@@ -38,22 +46,38 @@ class CreatorKpiResponse(BaseModel):
     active_creators: int
 
 
+class BudgetCycleResponse(BaseModel):
+    id: int
+    creator_id: int
+    period_type: str
+    amount: float
+    spent: float
+    remaining: float
+    start_date: date
+    end_date: date
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class BrandBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
 
 
 class BrandCreate(BrandBase):
-    pass
+    priority: str = Field("media", description="'alta' | 'media' | 'baja'")
 
 
 class BrandUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     is_active: Optional[bool] = None
+    priority: Optional[str] = None
 
 
 class BrandResponse(BrandBase):
     id: int
     is_active: bool
+    priority: str
 
     model_config = {"from_attributes": True}
 
@@ -62,7 +86,12 @@ class TicketResponse(BaseModel):
     id: int
     creator_id: int
     brand_id: int
+    budget_cycle_id: Optional[int] = None
     amount: float
+    status: str
+    rejection_reason: Optional[str] = None
+    reviewed_by_user_id: Optional[int] = None
+    reviewed_at: Optional[datetime] = None
     file_name: str
     file_path: str
     mime_type: str
@@ -70,13 +99,21 @@ class TicketResponse(BaseModel):
     notes: Optional[str] = None
     creator_name: Optional[str] = None
     brand_name: Optional[str] = None
+    brand_priority: Optional[str] = None
+    cycle_amount: Optional[float] = None
+    cycle_spent: Optional[float] = None
 
     model_config = {"from_attributes": True}
+
+
+class TicketRejectRequest(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=1000)
 
 
 class BrandSpendItem(BaseModel):
     brand_name: str
     total_spent: float
+    priority: str = "media"
 
 
 class MessageResponse(BaseModel):
@@ -165,7 +202,6 @@ class UserUpdateRequest(BaseModel):
 
 class SetUserActiveRequest(BaseModel):
     is_active: bool
-    confirm_username: Optional[str] = None
 
 
 class ResetPasswordResponse(BaseModel):

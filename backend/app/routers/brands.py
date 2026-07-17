@@ -12,6 +12,15 @@ from ..dependencies import get_current_user, require_role
 
 router = APIRouter(prefix="/api/brands", tags=["brands"])
 
+VALID_PRIORITIES = {p.value for p in models.BrandPriority}
+
+
+def _validate_priority(priority: str) -> None:
+    if priority not in VALID_PRIORITIES:
+        raise HTTPException(
+            status_code=400, detail=f"Prioridad inválida: '{priority}'. Usa 'alta', 'media' o 'baja'."
+        )
+
 
 @router.get("/", response_model=List[schemas.BrandResponse])
 def list_brands(
@@ -40,6 +49,7 @@ def create_brand(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_role("admin", "superadmin")),
 ):
+    _validate_priority(data.priority)
     try:
         return crud.create_brand(db, data)
     except IntegrityError:
@@ -57,6 +67,8 @@ def update_brand(
     brand = crud.get_brand(db, brand_id)
     if not brand:
         raise HTTPException(status_code=404, detail="Marca no encontrada.")
+    if data.priority is not None:
+        _validate_priority(data.priority)
     try:
         return crud.update_brand(db, brand, data)
     except IntegrityError:

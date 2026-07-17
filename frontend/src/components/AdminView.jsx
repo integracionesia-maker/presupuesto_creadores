@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { createCreator, updateCreator, createBrand, updateBrand } from "../api";
+import { createCreator, updateCreator, createBrand, updateBrand, fetchCreatorCycles } from "../api";
+import { useAuth } from "../context/AuthContext";
+import { PRIORITY_BADGE_CLASS, PRIORITY_LABELS } from "../utils/priority";
 import Modal from "./Modal";
 import UserManagement from "./UserManagement";
 
@@ -14,10 +16,13 @@ function formatCurrency(amount) {
 const SECTIONS = [
   { key: "creators", label: "Creadores" },
   { key: "brands", label: "Marcas" },
-  { key: "users", label: "Usuarios" },
+  { key: "users", label: "Usuarios", roles: ["superadmin"] },
 ];
 
 export default function AdminView({ creators, brands, onChange }) {
+  const { user } = useAuth();
+  const visibleSections = SECTIONS.filter((s) => !s.roles || s.roles.includes(user.role));
+
   const [section, setSection] = useState("creators");
 
   /* Creator form modal (create when editingCreator === null, edit otherwise) */
@@ -31,9 +36,16 @@ export default function AdminView({ creators, brands, onChange }) {
   /* Activation toggle confirmation: { type: "creator"|"brand", item, newActive } */
   const [confirmToggle, setConfirmToggle] = useState(null);
 
+  /* Cycle history modal */
+  const [cycleHistoryCreator, setCycleHistoryCreator] = useState(null);
+  const [cycleHistory, setCycleHistory] = useState([]);
+  const [cycleHistoryLoading, setCycleHistoryLoading] = useState(false);
+
   /* Shared form state (only one modal is open at a time) */
   const [formName, setFormName] = useState("");
   const [formBudget, setFormBudget] = useState("");
+  const [formCyclePeriod, setFormCyclePeriod] = useState("mensual");
+  const [formPriority, setFormPriority] = useState("media");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
@@ -49,7 +61,8 @@ export default function AdminView({ creators, brands, onChange }) {
     resetFeedback();
     setEditingCreator(creator);
     setFormName(creator ? creator.name : "");
-    setFormBudget(creator ? String(creator.initial_budget) : "");
+    setFormBudget(creator ? String(creator.cycle_amount ?? "") : "");
+    setFormCyclePeriod(creator ? creator.cycle_period || "mensual" : "mensual");
     setCreatorFormOpen(true);
   };
 
@@ -63,6 +76,7 @@ export default function AdminView({ creators, brands, onChange }) {
     resetFeedback();
     setEditingBrand(brand);
     setFormName(brand ? brand.name : "");
+    setFormPriority(brand ? brand.priority : "media");
     setBrandFormOpen(true);
   };
 
@@ -70,6 +84,24 @@ export default function AdminView({ creators, brands, onChange }) {
     setBrandFormOpen(false);
     setEditingBrand(null);
     resetFeedback();
+  };
+
+  const openCycleHistory = async (creator) => {
+    resetFeedback();
+    setCycleHistoryCreator(creator);
+    setCycleHistoryLoading(true);
+    try {
+      setCycleHistory(await fetchCreatorCycles(creator.id));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCycleHistoryLoading(false);
+    }
+  };
+
+  const closeCycleHistory = () => {
+    setCycleHistoryCreator(null);
+    setCycleHistory([]);
   };
 
   const openConfirmToggle = (type, item) => {
@@ -98,13 +130,17 @@ export default function AdminView({ creators, brands, onChange }) {
       return;
     }
     if (!formBudget || Number(formBudget) <= 0) {
-      setError("El presupuesto inicial debe ser mayor a $0.");
+      setError("El monto del ciclo debe ser mayor a $0.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const payload = { name, initial_budget: Number(formBudget) };
+      const payload = {
+        name,
+        cycle_budget_amount: Number(formBudget),
+        cycle_period: formCyclePeriod,
+      };
       if (editingCreator) {
         await updateCreator(editingCreator.id, payload);
       } else {
@@ -139,9 +175,9 @@ export default function AdminView({ creators, brands, onChange }) {
     setSubmitting(true);
     try {
       if (editingBrand) {
-        await updateBrand(editingBrand.id, { name });
+        await updateBrand(editingBrand.id, { name, priority: formPriority });
       } else {
-        await createBrand({ name });
+        await createBrand({ name, priority: formPriority });
       }
       setSuccessMsg("Marca guardada exitosamente.");
       setTimeout(() => {
@@ -180,7 +216,7 @@ export default function AdminView({ creators, brands, onChange }) {
   const budgetWarning =
     editingCreator &&
     formBudget !== "" &&
-    Number(formBudget) < editingCreator.spent_budget;
+    Number(formBudget) < (editingCreator.cycle_spent ?? 0);
 
   const toggleText = confirmToggle
     ? confirmToggle.type === "creator"
@@ -228,15 +264,15 @@ export default function AdminView({ creators, brands, onChange }) {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h2
           className="font-display text-lg font-bold uppercase tracking-[0.06em]"
-          style={{ color: "var(--go-white)" }}
+          style={{ color: "var(--go-text-primary)" }}
         >
           Administración
         </h2>
         <nav
           className="flex items-center gap-1 rounded-go p-1"
-          style={{ background: "var(--go-dark-800)" }}
+          style={{ background: "var(--go-surface)" }}
         >
-          {SECTIONS.map((s) => {
+          {visibleSections.map((s) => {
             const isActive = section === s.key;
             return (
               <button
@@ -244,8 +280,8 @@ export default function AdminView({ creators, brands, onChange }) {
                 onClick={() => setSection(s.key)}
                 className="rounded-go px-4 py-1.5 font-display text-sm font-semibold tracking-wide transition-all duration-200"
                 style={{
-                  background: isActive ? "var(--go-dark-600)" : "transparent",
-                  color: isActive ? "var(--go-orange)" : "var(--go-gray-2)",
+                  background: isActive ? "var(--go-surface-sunken)" : "transparent",
+                  color: isActive ? "var(--go-orange)" : "var(--go-text-secondary)",
                 }}
               >
                 {s.label}
@@ -271,7 +307,7 @@ export default function AdminView({ creators, brands, onChange }) {
           {creators.length === 0 ? (
             <div
               className="flex flex-col items-center justify-center py-16 font-body text-sm"
-              style={{ color: "var(--go-gray-2)" }}
+              style={{ color: "var(--go-text-secondary)" }}
             >
               <svg className="mb-3 h-10 w-10" fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24">
                 <path
@@ -285,13 +321,14 @@ export default function AdminView({ creators, brands, onChange }) {
           ) : (
             <div
               className="overflow-x-auto rounded-go-lg border"
-              style={{ borderColor: "var(--go-dark-600)" }}
+              style={{ borderColor: "var(--go-border)" }}
             >
               <table className="go-table">
                 <thead>
                   <tr>
                     <th>Nombre</th>
-                    <th className="text-right">Presupuesto</th>
+                    <th className="text-center">Ciclo</th>
+                    <th className="text-right">Monto</th>
                     <th className="text-right">Gastado</th>
                     <th className="text-right">Restante</th>
                     <th className="text-center">Estado</th>
@@ -304,22 +341,27 @@ export default function AdminView({ creators, brands, onChange }) {
                       <td>
                         <span
                           className="font-display text-sm font-semibold"
-                          style={{ color: "var(--go-white)" }}
+                          style={{ color: "var(--go-text-primary)" }}
                         >
                           {c.name}
                         </span>
                       </td>
-                      <td className="num text-right">{formatCurrency(c.initial_budget)}</td>
+                      <td className="text-center">
+                        <span className="go-badge" style={{ background: "var(--go-surface-sunken)", color: "var(--go-text-secondary)" }}>
+                          {c.cycle_period === "semanal" ? "Semanal" : "Mensual"}
+                        </span>
+                      </td>
+                      <td className="num text-right">{formatCurrency(c.cycle_amount ?? 0)}</td>
                       <td className="num text-right" style={{ color: "var(--go-warning)" }}>
-                        {formatCurrency(c.spent_budget)}
+                        {formatCurrency(c.cycle_spent ?? 0)}
                       </td>
                       <td
                         className="num text-right font-semibold"
                         style={{
-                          color: c.remaining_budget <= 0 ? "var(--go-error)" : "var(--go-success)",
+                          color: (c.cycle_remaining ?? 0) <= 0 ? "var(--go-error)" : "var(--go-success)",
                         }}
                       >
-                        {formatCurrency(c.remaining_budget)}
+                        {formatCurrency(c.cycle_remaining ?? 0)}
                       </td>
                       <td className="text-center">
                         <span className={`go-badge ${c.is_active ? "go-badge-success" : "go-badge-error"}`}>
@@ -333,6 +375,12 @@ export default function AdminView({ creators, brands, onChange }) {
                             className="btn-go-ghost text-xs px-3 py-1.5"
                           >
                             Editar
+                          </button>
+                          <button
+                            onClick={() => openCycleHistory(c)}
+                            className="btn-go-ghost text-xs px-3 py-1.5"
+                          >
+                            Histórico
                           </button>
                           <button
                             onClick={() => openConfirmToggle("creator", c)}
@@ -367,7 +415,7 @@ export default function AdminView({ creators, brands, onChange }) {
           {brands.length === 0 ? (
             <div
               className="flex flex-col items-center justify-center py-16 font-body text-sm"
-              style={{ color: "var(--go-gray-2)" }}
+              style={{ color: "var(--go-text-secondary)" }}
             >
               <svg className="mb-3 h-10 w-10" fill="none" stroke="currentColor" strokeWidth={1} viewBox="0 0 24 24">
                 <path
@@ -381,12 +429,13 @@ export default function AdminView({ creators, brands, onChange }) {
           ) : (
             <div
               className="overflow-x-auto rounded-go-lg border"
-              style={{ borderColor: "var(--go-dark-600)" }}
+              style={{ borderColor: "var(--go-border)" }}
             >
               <table className="go-table">
                 <thead>
                   <tr>
                     <th>Nombre</th>
+                    <th className="text-center">Prioridad</th>
                     <th className="text-center">Estado</th>
                     <th className="text-right">Acciones</th>
                   </tr>
@@ -397,9 +446,14 @@ export default function AdminView({ creators, brands, onChange }) {
                       <td>
                         <span
                           className="font-display text-sm font-semibold"
-                          style={{ color: "var(--go-white)" }}
+                          style={{ color: "var(--go-text-primary)" }}
                         >
                           {b.name}
+                        </span>
+                      </td>
+                      <td className="text-center">
+                        <span className={`go-badge ${PRIORITY_BADGE_CLASS[b.priority] || "go-badge-warning"}`}>
+                          {PRIORITY_LABELS[b.priority] || b.priority}
                         </span>
                       </td>
                       <td className="text-center">
@@ -433,7 +487,7 @@ export default function AdminView({ creators, brands, onChange }) {
       )}
 
       {/* ── Users section ──────────────────────────────────────────────── */}
-      {section === "users" && <UserManagement creators={creators} />}
+      {section === "users" && user.role === "superadmin" && <UserManagement creators={creators} />}
 
       {/* ── Creator create/edit modal ──────────────────────────────────── */}
       {creatorFormOpen && (
@@ -457,11 +511,11 @@ export default function AdminView({ creators, brands, onChange }) {
             </div>
 
             <div>
-              <label className="go-eyebrow mb-1.5 block">Presupuesto Inicial</label>
+              <label className="go-eyebrow mb-1.5 block">Monto del ciclo</label>
               <div className="relative">
                 <span
                   className="absolute left-3.5 top-[10px] font-mono text-sm"
-                  style={{ color: "var(--go-gray-2)" }}
+                  style={{ color: "var(--go-text-secondary)" }}
                 >
                   $
                 </span>
@@ -478,18 +532,30 @@ export default function AdminView({ creators, brands, onChange }) {
               </div>
             </div>
 
-            {budgetWarning && (
+            <div>
+              <label className="go-eyebrow mb-1.5 block">Periodicidad</label>
+              <select
+                value={formCyclePeriod}
+                onChange={(e) => setFormCyclePeriod(e.target.value)}
+                className="go-select"
+              >
+                <option value="mensual">Mensual</option>
+                <option value="semanal">Semanal</option>
+              </select>
+            </div>
+
+            {editingCreator && (
               <div
                 className="rounded-go border px-4 py-3 font-body text-sm"
                 style={{
-                  background: "rgba(245,158,11,0.08)",
-                  borderColor: "rgba(245,158,11,0.25)",
-                  color: "var(--go-warning)",
+                  background: "rgba(56,189,248,0.08)",
+                  borderColor: "rgba(56,189,248,0.25)",
+                  color: "#38bdf8",
                 }}
               >
-                Atención: el nuevo presupuesto ({formatCurrency(Number(formBudget))}) es
-                menor al gasto actual ({formatCurrency(editingCreator.spent_budget)}). El
-                presupuesto restante quedará negativo.
+                Este cambio aplica al <strong>próximo ciclo</strong> — el ciclo vigente de{" "}
+                {editingCreator.name} no se modifica.
+                {budgetWarning && " El nuevo monto es menor a lo ya gastado en el ciclo actual."}
               </div>
             )}
 
@@ -543,6 +609,19 @@ export default function AdminView({ creators, brands, onChange }) {
               />
             </div>
 
+            <div>
+              <label className="go-eyebrow mb-1.5 block">Prioridad</label>
+              <select
+                value={formPriority}
+                onChange={(e) => setFormPriority(e.target.value)}
+                className="go-select"
+              >
+                <option value="alta">Alta</option>
+                <option value="media">Media</option>
+                <option value="baja">Baja</option>
+              </select>
+            </div>
+
             {errorBanner}
             {successBanner}
 
@@ -580,7 +659,7 @@ export default function AdminView({ creators, brands, onChange }) {
           submitting={submitting}
         >
           <div className="space-y-4 px-6 py-5">
-            <p className="font-body text-sm" style={{ color: "#d4d4d4" }}>
+            <p className="font-body text-sm" style={{ color: "var(--go-text-primary)" }}>
               {toggleText}
             </p>
 
@@ -609,6 +688,62 @@ export default function AdminView({ creators, brands, onChange }) {
                 ) : (
                   "Confirmar"
                 )}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Histórico de ciclos ──────────────────────────────────────────── */}
+      {cycleHistoryCreator && (
+        <Modal
+          title={`Histórico de ciclos — ${cycleHistoryCreator.name}`}
+          onClose={closeCycleHistory}
+        >
+          <div className="space-y-4 px-6 py-5">
+            {cycleHistoryLoading ? (
+              <p className="font-body text-sm" style={{ color: "var(--go-text-secondary)" }}>
+                Cargando...
+              </p>
+            ) : cycleHistory.length === 0 ? (
+              <p className="font-body text-sm" style={{ color: "var(--go-text-secondary)" }}>
+                Sin ciclos registrados todavía.
+              </p>
+            ) : (
+              <div className="max-h-[60vh] overflow-y-auto overflow-x-auto rounded-go-lg border" style={{ borderColor: "var(--go-border)" }}>
+                <table className="go-table">
+                  <thead>
+                    <tr>
+                      <th>Periodo</th>
+                      <th className="text-right">Monto</th>
+                      <th className="text-right">Gastado</th>
+                      <th className="text-right">Restante</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cycleHistory.map((cy) => (
+                      <tr key={cy.id}>
+                        <td>{cy.start_date} — {cy.end_date}</td>
+                        <td className="num text-right">{formatCurrency(cy.amount)}</td>
+                        <td className="num text-right" style={{ color: "var(--go-warning)" }}>
+                          {formatCurrency(cy.spent)}
+                        </td>
+                        <td
+                          className="num text-right font-semibold"
+                          style={{ color: cy.remaining <= 0 ? "var(--go-error)" : "var(--go-success)" }}
+                        >
+                          {formatCurrency(cy.remaining)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <button onClick={closeCycleHistory} className="btn-go-ghost">
+                Cerrar
               </button>
             </div>
           </div>

@@ -112,17 +112,17 @@ export default function DateRangeFilter({ startDate, endDate, onChange }) {
             onClick={() => handlePreset(p)}
             className="rounded-full px-3 py-1 font-display text-[11px] font-semibold uppercase tracking-wider transition-all duration-200"
             style={{
-              background: "var(--go-dark-600)",
-              color: "var(--go-gray-2)",
-              border: "1px solid var(--go-dark-600)",
+              background: "var(--go-surface-sunken)",
+              color: "var(--go-text-secondary)",
+              border: "1px solid var(--go-border)",
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = "var(--go-orange)";
               e.currentTarget.style.color = "var(--go-orange)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "var(--go-dark-600)";
-              e.currentTarget.style.color = "var(--go-gray-2)";
+              e.currentTarget.style.borderColor = "var(--go-border)";
+              e.currentTarget.style.color = "var(--go-text-secondary)";
             }}
           >
             {p.label}

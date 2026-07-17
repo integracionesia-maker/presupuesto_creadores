@@ -72,26 +72,34 @@ def make_user(
     return user
 
 
-def make_creator(db, *, name="Creador Test", initial_budget=10_000.0):
-    creator = models.Creator(name=name, initial_budget=initial_budget, remaining_budget=initial_budget)
+def make_creator(
+    db, *, name="Creador Test", initial_budget=10_000.0, cycle_budget_amount=None, cycle_period="mensual"
+):
+    creator = models.Creator(
+        name=name,
+        initial_budget=initial_budget,
+        remaining_budget=initial_budget,
+        cycle_budget_amount=cycle_budget_amount if cycle_budget_amount is not None else initial_budget,
+        cycle_period=cycle_period,
+    )
     db.add(creator)
     db.commit()
     db.refresh(creator)
     return creator
 
 
-def make_brand(db, *, name="Marca Test"):
-    brand = models.Brand(name=name)
+def make_brand(db, *, name="Marca Test", priority="media"):
+    brand = models.Brand(name=name, priority=priority)
     db.add(brand)
     db.commit()
     db.refresh(brand)
     return brand
 
 
-def make_ticket(db, *, creator, brand, amount=100.0):
+def make_ticket(db, *, creator, brand, amount=100.0, status="aprobado", actor_user_id=1):
     from app import crud
 
-    return crud.create_ticket_transactional(
+    return crud.create_ticket(
         db=db,
         creator=creator,
         brand=brand,
@@ -100,6 +108,8 @@ def make_ticket(db, *, creator, brand, amount=100.0):
         file_path=str(Path(__file__).parent / "fixtures_dummy.pdf"),
         mime_type="application/pdf",
         notes=None,
+        status=status,
+        actor_user_id=actor_user_id,
     )
 
 
@@ -147,25 +157,30 @@ def creador_user_b(db, creator_b):
     return make_user(db, username="creador.b", password=PASSWORD_CREADOR, role="creador", creator_id=creator_b.id)
 
 
-@pytest.fixture
-def logged_in_superadmin(client, superadmin_user):
-    login(client, "superadmin", PASSWORD_SUPERADMIN)
-    return client
+def _independent_client(username, password):
+    """Cliente propio (no el de la fixture `client`): usar dos fixtures
+    logged_in_* distintas en el mismo test requiere sesiones independientes,
+    de lo contrario comparten cookie jar y una pisa la sesión de la otra."""
+    c = TestClient(app)
+    login(c, username, password)
+    return c
 
 
 @pytest.fixture
-def logged_in_admin(client, admin_user):
-    login(client, "admin1", PASSWORD_ADMIN)
-    return client
+def logged_in_superadmin(superadmin_user):
+    return _independent_client("superadmin", PASSWORD_SUPERADMIN)
 
 
 @pytest.fixture
-def logged_in_creador(client, creador_user):
-    login(client, "creador.a", PASSWORD_CREADOR)
-    return client
+def logged_in_admin(admin_user):
+    return _independent_client("admin1", PASSWORD_ADMIN)
 
 
 @pytest.fixture
-def logged_in_creador_b(client, creador_user_b):
-    login(client, "creador.b", PASSWORD_CREADOR)
-    return client
+def logged_in_creador(creador_user):
+    return _independent_client("creador.a", PASSWORD_CREADOR)
+
+
+@pytest.fixture
+def logged_in_creador_b(creador_user_b):
+    return _independent_client("creador.b", PASSWORD_CREADOR)

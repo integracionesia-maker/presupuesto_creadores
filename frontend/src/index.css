@@ -35,6 +35,38 @@
 
   --go-radius: 8px;
   --go-radius-lg: 12px;
+
+  /* ── Tokens semánticos por tema (R2) — default oscuro ────────────────── */
+  --go-bg: var(--go-dark-900);
+  --go-surface: var(--go-dark-800);
+  --go-surface-raised: var(--go-dark-700);
+  --go-surface-sunken: var(--go-dark-600);
+  --go-border: var(--go-dark-600);
+  --go-text-primary: var(--go-white);
+  --go-text-secondary: var(--go-gray-2);
+  --go-text-muted: #6b7280;
+  --go-table-row-text: #d4d4d4;
+  --go-input-bg: var(--go-dark-600);
+  --go-input-border: var(--go-dark-600);
+  --go-overlay: rgba(0, 0, 0, 0.6);
+}
+
+/* Sin ":root" a propósito: además del tema global en <html>, R8 (reporte PDF)
+   envuelve su plantilla off-screen en un contenedor local con este atributo
+   para forzar tema claro sin tocar el tema real del usuario. */
+[data-theme="light"] {
+  --go-bg: #ffffff;
+  --go-surface: #ffffff;
+  --go-surface-raised: #f7f6f0;
+  --go-surface-sunken: var(--go-cream);
+  --go-border: #dcdbd0;
+  --go-text-primary: var(--go-black);
+  --go-text-secondary: var(--go-gray-1);
+  --go-text-muted: #8a8a8a;
+  --go-table-row-text: #3d3d3d;
+  --go-input-bg: #ffffff;
+  --go-input-border: #c5c5c5;
+  --go-overlay: rgba(38, 38, 38, 0.5);
 }
 
 @layer base {
@@ -43,13 +75,16 @@
   }
 
   body {
-    @apply min-h-screen bg-go-dark-900 font-body text-gray-200 antialiased;
+    @apply min-h-screen font-body antialiased;
+    background: var(--go-bg);
+    color: var(--go-text-secondary);
+    transition: background-color 200ms, color 200ms;
   }
 
   /* Firefox scrollbar */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #27272a #09090b;
+    scrollbar-color: var(--go-border) var(--go-bg);
   }
 
   /* Chrome/Edge scrollbar */
@@ -58,14 +93,14 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #09090b;
+    background: var(--go-bg);
   }
   ::-webkit-scrollbar-thumb {
-    background: #27272a;
+    background: var(--go-border);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #535353;
+    background: var(--go-text-muted);
   }
 }
 
@@ -93,8 +128,8 @@
   .btn-go-ghost {
     @apply inline-flex items-center gap-2 rounded-go border px-4 py-2
            font-display text-sm font-semibold transition-all duration-200;
-    border-color: var(--go-gray-2);
-    color: var(--go-gray-2);
+    border-color: var(--go-text-secondary);
+    color: var(--go-text-secondary);
     background: transparent;
   }
   .btn-go-ghost:hover {
@@ -105,34 +140,37 @@
   /* ── GO card ──────────────────────────────────────────────────────── */
   .go-card {
     @apply rounded-go-lg border p-6;
-    background: var(--go-dark-700);
-    border-color: var(--go-dark-600);
+    background: var(--go-surface-raised);
+    border-color: var(--go-border);
   }
 
   /* ── GO input ─────────────────────────────────────────────────────── */
   .go-input {
     @apply w-full rounded-go border px-3.5 py-2.5 font-body text-sm
            transition-all duration-200;
-    background: var(--go-dark-600);
-    border-color: var(--go-dark-600);
-    color: #e5e5e5;
+    background: var(--go-input-bg);
+    border-color: var(--go-input-border);
+    color: var(--go-text-primary);
   }
   .go-input::placeholder {
-    color: #6b7280;
+    color: var(--go-text-muted);
   }
   .go-input:focus {
     @apply outline-none;
     border-color: var(--go-orange);
     box-shadow: 0 0 0 3px var(--go-orange-tint);
   }
+  .go-input:disabled {
+    opacity: 0.6;
+  }
 
   /* ── GO select ────────────────────────────────────────────────────── */
   .go-select {
     @apply w-full rounded-go border px-3.5 py-2.5 font-body text-sm
            transition-all duration-200 appearance-none;
-    background: var(--go-dark-600);
-    border-color: var(--go-dark-600);
-    color: #e5e5e5;
+    background-color: var(--go-input-bg);
+    border-color: var(--go-input-border);
+    color: var(--go-text-primary);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='m2 4 4 4 4-4'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 12px center;
@@ -183,25 +221,25 @@
   .go-table thead th {
     @apply px-3 py-3 text-left font-display text-[11px] font-bold
            uppercase tracking-[0.10em];
-    color: var(--go-gray-2);
+    color: var(--go-text-secondary);
   }
   .go-table tbody tr {
-    border-bottom: 1px solid var(--go-dark-600);
+    border-bottom: 1px solid var(--go-border);
     transition: background 150ms;
   }
   .go-table tbody tr:hover {
-    background: rgba(251, 103, 11, 0.04);
+    background: var(--go-orange-tint);
   }
   .go-table tbody td {
     @apply px-3 py-3 align-middle;
-    color: #d4d4d4;
+    color: var(--go-table-row-text);
   }
   .go-table td.num {
     font-family: var(--go-font-mono);
     font-variant-numeric: tabular-nums;
   }
 
-  /* ── Dark date inputs ─────────────────────────────────────────────── */
+  /* ── Date inputs, theme-aware ─────────────────────────────────────── */
   input[type="date"] {
     color-scheme: dark;
   }
@@ -213,6 +251,13 @@
   input[type="date"]::-webkit-datetime-edit-month-field,
   input[type="date"]::-webkit-datetime-edit-day-field,
   input[type="date"]::-webkit-datetime-edit-year-field {
-    color: #e5e5e5;
+    color: var(--go-text-primary);
   }
+}
+
+:root[data-theme="light"] input[type="date"] {
+  color-scheme: light;
+}
+:root[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
 }

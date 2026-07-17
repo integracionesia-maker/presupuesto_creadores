@@ -35,13 +35,13 @@ export default function HomePage() {
         <p className="go-eyebrow mb-3">Grupo Ortiz</p>
         <h1
           className="font-display text-2xl font-bold uppercase tracking-[0.04em] sm:text-3xl"
-          style={{ color: "var(--go-white)" }}
+          style={{ color: "var(--go-text-primary)" }}
         >
           Bienvenido al Control de Presupuestos
         </h1>
         <p
           className="mt-3 font-body text-sm sm:text-base"
-          style={{ color: "var(--go-gray-2)" }}
+          style={{ color: "var(--go-text-secondary)" }}
         >
           Gestiona los presupuestos de creadores de contenido, registra
           tickets de gasto y monitorea el desempeño de cada campaña.
@@ -57,15 +57,15 @@ export default function HomePage() {
             className="go-card group transition-all duration-200 hover:-translate-y-0.5"
             style={{ textDecoration: "none" }}
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--go-orange)")}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--go-dark-600)")}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--go-border)")}
           >
             <div
               className="flex h-12 w-12 items-center justify-center rounded-go-lg transition-colors duration-200 group-hover:bg-[var(--go-orange-tint)]"
-              style={{ background: "var(--go-dark-600)" }}
+              style={{ background: "var(--go-surface-sunken)" }}
             >
               <svg
                 className="h-6 w-6 transition-colors duration-200 group-hover:text-[var(--go-orange)]"
-                style={{ color: "var(--go-gray-2)" }}
+                style={{ color: "var(--go-text-secondary)" }}
                 fill="none"
                 stroke="currentColor"
                 strokeWidth={1.5}
@@ -76,13 +76,13 @@ export default function HomePage() {
             </div>
             <h3
               className="mt-4 font-display text-base font-bold uppercase tracking-[0.06em]"
-              style={{ color: "var(--go-white)" }}
+              style={{ color: "var(--go-text-primary)" }}
             >
               {s.title}
             </h3>
             <p
               className="mt-1.5 font-body text-sm"
-              style={{ color: "var(--go-gray-2)" }}
+              style={{ color: "var(--go-text-secondary)" }}
             >
               {s.description}
             </p>

@@ -9,19 +9,17 @@ const ROLE_LABELS = {
   creador: "Creador",
 };
 
+const ROLE_OPTIONS = [
+  { value: "admin", label: "Administrador" },
+  { value: "creador", label: "Creador" },
+];
+
 function emptyForm() {
   return { username: "", email: "", full_name: "", role: "creador", creator_id: "", password: "" };
 }
 
 export default function UserManagement({ creators }) {
   const { user: currentUser } = useAuth();
-  const isSuperadmin = currentUser.role === "superadmin";
-  const roleOptions = isSuperadmin
-    ? [
-        { value: "admin", label: "Administrador" },
-        { value: "creador", label: "Creador" },
-      ]
-    : [{ value: "creador", label: "Creador" }];
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +32,6 @@ export default function UserManagement({ creators }) {
   const [formError, setFormError] = useState(null);
 
   const [confirmToggle, setConfirmToggle] = useState(null);
-  const [confirmUsername, setConfirmUsername] = useState("");
 
   const [resetResult, setResetResult] = useState(null);
 
@@ -125,7 +122,6 @@ export default function UserManagement({ creators }) {
 
   const openToggleConfirm = (u) => {
     setConfirmToggle({ user: u, newActive: !u.is_active });
-    setConfirmUsername("");
   };
 
   const handleToggleConfirm = async () => {
@@ -134,8 +130,7 @@ export default function UserManagement({ creators }) {
     setSubmitting(true);
     setError(null);
     try {
-      const isSelf = target.id === currentUser.id;
-      await setUserActive(target.id, newActive, isSelf ? confirmUsername : undefined);
+      await setUserActive(target.id, newActive);
       setConfirmToggle(null);
       load();
     } catch (err) {
@@ -169,18 +164,18 @@ export default function UserManagement({ creators }) {
       {errorBanner}
 
       {loading ? (
-        <p className="font-body text-sm" style={{ color: "var(--go-gray-2)" }}>
+        <p className="font-body text-sm" style={{ color: "var(--go-text-secondary)" }}>
           Cargando...
         </p>
       ) : users.length === 0 ? (
         <div
           className="flex flex-col items-center justify-center py-16 font-body text-sm"
-          style={{ color: "var(--go-gray-2)" }}
+          style={{ color: "var(--go-text-secondary)" }}
         >
           <p>No hay usuarios registrados.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-go-lg border" style={{ borderColor: "var(--go-dark-600)" }}>
+        <div className="overflow-x-auto rounded-go-lg border" style={{ borderColor: "var(--go-border)" }}>
           <table className="go-table">
             <thead>
               <tr>
@@ -200,18 +195,18 @@ export default function UserManagement({ creators }) {
                   <tr key={u.id}>
                     <td className="font-mono text-xs">{u.username}</td>
                     <td>
-                      <span className="font-display text-sm font-semibold" style={{ color: "var(--go-white)" }}>
+                      <span className="font-display text-sm font-semibold" style={{ color: "var(--go-text-primary)" }}>
                         {u.full_name}
                       </span>
                       {isSelf && <span className="go-badge go-badge-warning ml-2">Tú</span>}
                     </td>
-                    <td className="font-body text-xs" style={{ color: "var(--go-gray-2)" }}>
+                    <td className="font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
                       {u.email}
                     </td>
                     <td>
                       <span
                         className="go-badge"
-                        style={{ background: "var(--go-dark-600)", color: "var(--go-gray-2)" }}
+                        style={{ background: "var(--go-surface-sunken)", color: "var(--go-text-secondary)" }}
                       >
                         {ROLE_LABELS[u.role] || u.role}
                       </span>
@@ -223,7 +218,7 @@ export default function UserManagement({ creators }) {
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-2">
-                        {!isTargetSuperadmin && !isSelf && (
+                        {!isTargetSuperadmin && (
                           <>
                             <button onClick={() => openEditForm(u)} className="btn-go-ghost text-xs px-3 py-1.5">
                               Editar
@@ -295,9 +290,8 @@ export default function UserManagement({ creators }) {
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value, creator_id: "" })}
                 className="go-select"
-                disabled={roleOptions.length === 1}
               >
-                {roleOptions.map((r) => (
+                {ROLE_OPTIONS.map((r) => (
                   <option key={r.value} value={r.value}>
                     {r.label}
                   </option>
@@ -360,25 +354,11 @@ export default function UserManagement({ creators }) {
       {confirmToggle && (
         <Modal title="Confirmar cambio de estado" onClose={() => setConfirmToggle(null)} submitting={submitting}>
           <div className="space-y-4 px-6 py-5">
-            <p className="font-body text-sm" style={{ color: "#d4d4d4" }}>
+            <p className="font-body text-sm" style={{ color: "var(--go-text-primary)" }}>
               {confirmToggle.newActive
                 ? `¿Reactivar a ${confirmToggle.user.full_name}?`
                 : `¿Desactivar a ${confirmToggle.user.full_name}? No podrá iniciar sesión hasta que sea reactivado.`}
             </p>
-
-            {confirmToggle.user.id === currentUser.id && !confirmToggle.newActive && (
-              <div>
-                <label className="go-eyebrow mb-1.5 block">
-                  Escribe tu usuario ("{currentUser.username}") para confirmar
-                </label>
-                <input
-                  type="text"
-                  value={confirmUsername}
-                  onChange={(e) => setConfirmUsername(e.target.value)}
-                  className="go-input"
-                />
-              </div>
-            )}
 
             {errorBanner}
 
@@ -402,7 +382,7 @@ export default function UserManagement({ creators }) {
       {resetResult && (
         <Modal title="Contraseña temporal generada" onClose={() => setResetResult(null)}>
           <div className="space-y-4 px-6 py-5">
-            <p className="font-body text-sm" style={{ color: "#d4d4d4" }}>
+            <p className="font-body text-sm" style={{ color: "var(--go-text-primary)" }}>
               Comparte esta contraseña temporal con <strong>{resetResult.username}</strong> por un canal seguro.
               Solo se muestra una vez.
             </p>

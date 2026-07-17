@@ -1,6 +1,14 @@
 // @ts-check
 import { test, expect } from "@playwright/test";
 
+// Nota: el backend limita a 30 logins/15min por IP (rate limiting, ver
+// security.py). Cada archivo de esta suite se mantiene bien por debajo de
+// eso, pero correr TODOS los .spec.js en una sola invocación de Playwright
+// puede acercarse al límite (todos los tests pegan al mismo 127.0.0.1). Si
+// eso pasa, corre los archivos por separado:
+//   npx playwright test e2e/auth.spec.js
+//   npx playwright test e2e/presupuesto-flujo-completo.spec.js
+
 // Sufijo único para que la suite sea repetible contra la misma DB de prueba
 // sin colisionar con usuarios/creadores de una corrida anterior.
 const RUN_ID = Date.now();
@@ -47,6 +55,8 @@ async function changePasswordOnForcedPerfil(page, currentPassword, newPassword) 
 }
 
 async function logout(page) {
+  // El botón vive dentro del popover de perfil (R1) — hay que abrirlo primero.
+  await page.click('button[aria-haspopup="true"]');
   await page.click('button:has-text("Cerrar sesión")');
   await expect(page).toHaveURL(/\/login/);
 }
@@ -79,24 +89,49 @@ test.describe.serial("Flujo de autenticación por rol", () => {
     await logout(page);
   });
 
-  test("admin inicia sesión, cambia contraseña, crea un creador y un usuario vinculado", async ({ page }) => {
+  test("admin inicia sesión, ve dashboard/creadores pero NO usuarios, y crea un creador", async ({ page }) => {
     test.skip(!SUPERADMIN.password, "Requiere que el test anterior haya creado el admin");
 
     await login(page, ADMIN.username, ADMIN.password);
     await changePasswordOnForcedPerfil(page, ADMIN.password, ADMIN.newPassword);
 
-    // Un admin no ve Dashboard/Creadores como items separados sin datos, pero SI ve Administración.
+    // R5: admin ve dashboard/creadores/administración (todo excepto usuarios).
+    await expect(page.locator("nav")).toContainText("Dashboard");
+    await expect(page.locator("nav")).toContainText("Creadores");
+    await expect(page.locator("nav")).toContainText("Administración");
+    await page.goto("/dashboard");
+    await expect(page).not.toHaveURL(/\/403/);
+
     await page.goto("/administracion");
+    // R4: "Usuarios" ya no es una pestaña visible/operable para admin.
+    await expect(page.getByRole("button", { name: "Usuarios", exact: true })).toHaveCount(0);
+
     await page.click('button:has-text("Creadores")');
     await page.click('button:has-text("Nuevo Creador")');
 
     const creatorModal = page.locator(".fixed.inset-0");
     await creatorModal.locator('input[type="text"]').fill(CREATOR_NAME);
-    await creatorModal.locator('input[type="number"]').fill("50000");
+    await creatorModal.locator('input[type="number"]').fill("50000"); // monto del ciclo, periodicidad queda "Mensual" (default)
     await creatorModal.locator('button:has-text("Crear")').click();
     await expect(page.getByText(CREATOR_NAME)).toBeVisible();
 
-    // Vincular un usuario rol creador a ese Creator.
+    await logout(page);
+  });
+
+  test("R4: admin recibe 403 si intenta la API de usuarios directamente", async ({ page, request }) => {
+    test.skip(!SUPERADMIN.password, "Requiere que el test anterior haya creado el admin");
+
+    await login(page, ADMIN.username, ADMIN.newPassword);
+    const resp = await page.request.get("/api/users/");
+    expect(resp.status()).toBe(403);
+    await logout(page);
+  });
+
+  test("superadmin vincula un usuario rol creador al creador recién creado (R4: solo superadmin gestiona usuarios)", async ({ page }) => {
+    test.skip(!SUPERADMIN.password, "Requiere que el test anterior haya creado el creador");
+
+    await login(page, SUPERADMIN.username, "SuperClaveE2ENueva123!");
+    await page.goto("/administracion");
     await page.click('button:has-text("Usuarios")');
     await page.click('button:has-text("Nuevo Usuario")');
 
@@ -104,7 +139,7 @@ test.describe.serial("Flujo de autenticación por rol", () => {
     await userModal.locator('input[type="text"]').nth(0).fill(CREADOR.username);
     await userModal.locator('input[type="text"]').nth(1).fill(CREADOR.fullName);
     await userModal.locator('input[type="email"]').fill(CREADOR.email);
-    // El rol ya viene fijo en "creador" para un admin (único que puede asignar).
+    // El rol por default del select ya es "creador"; solo falta vincular el creador.
     await userModal.locator("select").nth(1).selectOption({ label: CREATOR_NAME });
     await userModal.locator('input[type="password"]').fill(CREADOR.password);
     await userModal.locator('button:has-text("Crear")').click();
@@ -113,15 +148,16 @@ test.describe.serial("Flujo de autenticación por rol", () => {
     await logout(page);
   });
 
-  test("creador inicia sesión, ve solo su información y cierra sesión", async ({ page }) => {
+  test("creador inicia sesión, ve solo su información (ciclo) y cierra sesión", async ({ page }) => {
     test.skip(!SUPERADMIN.password, "Requiere que el test anterior haya creado el creador");
 
     await login(page, CREADOR.username, CREADOR.password);
     await changePasswordOnForcedPerfil(page, CREADOR.password, CREADOR.newPassword);
 
-    // Sidebar de un creador: sin Dashboard, Creadores ni Administración.
+    // Sidebar de un creador: sin Dashboard, Creadores, Validación ni Administración.
     await expect(page.locator("nav")).not.toContainText("Dashboard");
     await expect(page.locator("nav")).not.toContainText("Administración");
+    await expect(page.locator("nav")).not.toContainText("Validación");
 
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/\/403/);
@@ -130,7 +166,7 @@ test.describe.serial("Flujo de autenticación por rol", () => {
     await expect(page.getByText("Historial de Transacciones")).toBeVisible();
 
     await page.goto("/perfil");
-    await expect(page.getByText("Mi presupuesto")).toBeVisible();
+    await expect(page.getByText("Mi ciclo de presupuesto")).toBeVisible();
     await expect(page.getByText("$50,000.00").first()).toBeVisible();
 
     await logout(page);

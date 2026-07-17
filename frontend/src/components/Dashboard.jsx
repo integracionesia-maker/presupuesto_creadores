@@ -1,10 +1,13 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import KpiCard from "./KpiCard";
 import DateRangeFilter from "./DateRangeFilter";
 import MonthlySpendChart from "./charts/MonthlySpendChart";
 import CreatorUsageChart from "./charts/CreatorUsageChart";
 import BrandSpendApexChart from "./charts/BrandSpendApexChart";
 import SpendTrendChart from "./charts/SpendTrendChart";
+import DashboardPdfTemplate from "./PdfReport/DashboardPdfTemplate";
+import { generateDashboardPdf } from "./PdfReport/generateDashboardPdf";
+import { useAuth } from "../context/AuthContext";
 import {
   fetchDashboardSummary,
   fetchMonthlySpend,
@@ -29,12 +32,15 @@ function fmtDateParam(d) {
 }
 
 export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
+  const { user } = useAuth();
   const [summary, setSummary] = useState(null);
   const [monthly, setMonthly] = useState([]);
   const [creatorUsage, setCreatorUsage] = useState([]);
   const [brandSpend, setBrandSpend] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pdfState, setPdfState] = useState("idle"); // idle | rendering | generating
+  const pdfSnapshotRef = useRef(null);
 
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
@@ -72,14 +78,59 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
       ? (kpi.total_remaining / kpi.total_budget) * 100
       : 0;
 
+  const handleDownloadPdf = async () => {
+    if (pdfState !== "idle") return;
+    setError(null);
+    pdfSnapshotRef.current = {
+      kpi,
+      summary,
+      monthly,
+      creatorUsage,
+      brandSpend,
+      dateRange,
+      generatedAt: new Date(),
+      generatedByName: user?.full_name,
+    };
+    setPdfState("rendering");
+    try {
+      // La plantilla off-screen se monta recién ahora; se espera un tick de
+      // pintado (ApexCharts renderiza su SVG de forma asíncrona) antes de
+      // capturarla con html2canvas.
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      setPdfState("generating");
+      const start = fmtDateParam(dateRange.start) || "historico";
+      const end = fmtDateParam(dateRange.end) || "actual";
+      await generateDashboardPdf({ filename: `reporte-presupuesto_${start}_a_${end}.pdf` });
+    } catch (e) {
+      setError(e.message || "No se pudo generar el PDF.");
+    } finally {
+      setPdfState("idle");
+    }
+  };
+
   return (
     <div className="space-y-8">
-      {/* ── Date filter ──────────────────────────────────────────────── */}
-      <DateRangeFilter
-        startDate={dateRange.start}
-        endDate={dateRange.end}
-        onChange={onDateRangeChange}
-      />
+      {/* ── Date filter + descarga de reporte ────────────────────────── */}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <DateRangeFilter
+          startDate={dateRange.start}
+          endDate={dateRange.end}
+          onChange={onDateRangeChange}
+        />
+        <button
+          type="button"
+          onClick={handleDownloadPdf}
+          disabled={loading || pdfState !== "idle"}
+          className="btn-go-ghost shrink-0"
+        >
+          {pdfState === "idle" && "Descargar PDF"}
+          {pdfState === "rendering" && "Preparando reporte…"}
+          {pdfState === "generating" && "Generando PDF…"}
+        </button>
+      </div>
 
       {/* ── Error ─────────────────────────────────────────────────────── */}
       {error && (
@@ -101,13 +152,13 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
           <div
             className="h-8 w-8 animate-spin rounded-full border-[3px]"
             style={{
-              borderColor: "var(--go-dark-600)",
+              borderColor: "var(--go-border)",
               borderTopColor: "var(--go-orange)",
             }}
           />
           <span
             className="ml-3 font-body text-sm"
-            style={{ color: "var(--go-gray-2)" }}
+            style={{ color: "var(--go-text-secondary)" }}
           >
             Cargando dashboard...
           </span>
@@ -171,7 +222,7 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
             <div className="flex items-center justify-between mb-6">
               <h2
                 className="font-display text-sm font-bold uppercase tracking-[0.08em]"
-                style={{ color: "var(--go-white)" }}
+                style={{ color: "var(--go-text-primary)" }}
               >
                 Transacciones por Mes
               </h2>
@@ -186,7 +237,7 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
               <div className="flex items-center justify-between mb-6">
                 <h2
                   className="font-display text-sm font-bold uppercase tracking-[0.08em]"
-                  style={{ color: "var(--go-white)" }}
+                  style={{ color: "var(--go-text-primary)" }}
                 >
                   Gastos por Marca
                 </h2>
@@ -199,7 +250,7 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
               <div className="flex items-center justify-between mb-6">
                 <h2
                   className="font-display text-sm font-bold uppercase tracking-[0.08em]"
-                  style={{ color: "var(--go-white)" }}
+                  style={{ color: "var(--go-text-primary)" }}
                 >
                   Uso de Presupuesto por Creador
                 </h2>
@@ -214,7 +265,7 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
             <div className="flex items-center justify-between mb-6">
               <h2
                 className="font-display text-sm font-bold uppercase tracking-[0.08em]"
-                style={{ color: "var(--go-white)" }}
+                style={{ color: "var(--go-text-primary)" }}
               >
                 Tendencia de Gasto Acumulado
               </h2>
@@ -223,6 +274,11 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
             <SpendTrendChart data={monthly} />
           </section>
         </>
+      )}
+
+      {/* ── Plantilla off-screen para el PDF (R8), solo montada al generar ── */}
+      {pdfState !== "idle" && pdfSnapshotRef.current && (
+        <DashboardPdfTemplate {...pdfSnapshotRef.current} />
       )}
     </div>
   );

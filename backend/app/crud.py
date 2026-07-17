@@ -4,9 +4,116 @@ from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract
+from sqlalchemy import func, extract, case, and_
 
 from . import models, schemas
+
+
+def _priority_rank(column):
+    """CASE que ordena alta < media < baja (orden alfabético no sirve)."""
+    return case(
+        (column == models.BrandPriority.ALTA.value, 0),
+        (column == models.BrandPriority.MEDIA.value, 1),
+        (column == models.BrandPriority.BAJA.value, 2),
+        else_=3,
+    )
+
+
+# ── Ciclos de presupuesto ────────────────────────────────────────────────────
+# Implementación perezosa (doc/mejoras-diseno-fase1.md §1): un ciclo se crea la
+# primera vez que se consulta o se necesita para asignar un ticket, nunca por cron.
+
+def _week_bounds(d: date) -> tuple:
+    start = d - timedelta(days=d.weekday())  # lunes
+    return start, start + timedelta(days=6)  # domingo
+
+
+def _month_bounds(d: date) -> tuple:
+    start = d.replace(day=1)
+    next_month = (
+        start.replace(year=start.year + 1, month=1)
+        if start.month == 12
+        else start.replace(month=start.month + 1)
+    )
+    return start, next_month - timedelta(days=1)
+
+
+def _period_bounds(period_type: str, d: date) -> tuple:
+    if period_type == models.CyclePeriod.SEMANAL.value:
+        return _week_bounds(d)
+    return _month_bounds(d)
+
+
+def get_or_create_cycle_for_date(
+    db: Session, creator: models.Creator, target_date: date
+) -> models.BudgetCycle:
+    existing = (
+        db.query(models.BudgetCycle)
+        .filter(
+            models.BudgetCycle.creator_id == creator.id,
+            models.BudgetCycle.start_date <= target_date,
+            models.BudgetCycle.end_date >= target_date,
+        )
+        .first()
+    )
+    if existing:
+        return existing
+
+    period_type = creator.cycle_period or models.CyclePeriod.MENSUAL.value
+    amount = creator.cycle_budget_amount or 0.0
+
+    last_cycle = (
+        db.query(models.BudgetCycle)
+        .filter(models.BudgetCycle.creator_id == creator.id)
+        .order_by(models.BudgetCycle.end_date.desc())
+        .first()
+    )
+
+    cursor = last_cycle.end_date + timedelta(days=1) if last_cycle else target_date
+
+    created = None
+    while True:
+        start, end = _period_bounds(period_type, cursor)
+        created = models.BudgetCycle(
+            creator_id=creator.id,
+            period_type=period_type,
+            amount=amount,
+            spent=0.0,
+            start_date=start,
+            end_date=end,
+        )
+        db.add(created)
+        db.flush()
+        if end >= target_date:
+            break
+        cursor = end + timedelta(days=1)
+
+    db.commit()
+    db.refresh(created)
+    return created
+
+
+def list_cycles_for_creator(db: Session, creator_id: int) -> List[models.BudgetCycle]:
+    return (
+        db.query(models.BudgetCycle)
+        .filter(models.BudgetCycle.creator_id == creator_id)
+        .order_by(models.BudgetCycle.start_date.desc())
+        .all()
+    )
+
+
+def cycle_to_response(cycle: models.BudgetCycle) -> schemas.BudgetCycleResponse:
+    return schemas.BudgetCycleResponse(
+        id=cycle.id,
+        creator_id=cycle.creator_id,
+        period_type=cycle.period_type,
+        amount=cycle.amount,
+        spent=cycle.spent,
+        remaining=cycle.amount - cycle.spent,
+        start_date=cycle.start_date,
+        end_date=cycle.end_date,
+        created_at=cycle.created_at,
+    )
 
 
 # ── Creators ─────────────────────────────────────────────────────────────────
@@ -27,6 +134,8 @@ def create_creator(db: Session, data: schemas.CreatorCreate) -> models.Creator:
         name=data.name,
         initial_budget=data.initial_budget,
         remaining_budget=data.initial_budget,
+        cycle_budget_amount=data.cycle_budget_amount,
+        cycle_period=data.cycle_period,
     )
     db.add(creator)
     db.commit()
@@ -48,19 +157,41 @@ def update_creator(
     return creator
 
 
+def creator_to_response(db: Session, creator: models.Creator) -> schemas.CreatorResponse:
+    cycle = get_or_create_cycle_for_date(db, creator, date.today())
+    return schemas.CreatorResponse(
+        id=creator.id,
+        name=creator.name,
+        initial_budget=creator.initial_budget,
+        spent_budget=creator.spent_budget,
+        remaining_budget=creator.remaining_budget,
+        is_active=creator.is_active,
+        created_at=creator.created_at,
+        cycle_period=cycle.period_type,
+        cycle_amount=cycle.amount,
+        cycle_spent=cycle.spent,
+        cycle_remaining=cycle.amount - cycle.spent,
+        cycle_start_date=cycle.start_date,
+        cycle_end_date=cycle.end_date,
+    )
+
+
 def get_creators_kpi(db: Session) -> schemas.CreatorKpiResponse:
     active = (
         db.query(models.Creator)
         .filter(models.Creator.is_active == True)
         .all()
     )
-    total_budget = sum(c.initial_budget for c in active)
-    total_spent = sum(c.spent_budget for c in active)
-    total_remaining = sum(c.remaining_budget for c in active)
+    total_budget = 0.0
+    total_spent = 0.0
+    for creator in active:
+        cycle = get_or_create_cycle_for_date(db, creator, date.today())
+        total_budget += cycle.amount
+        total_spent += cycle.spent
     return schemas.CreatorKpiResponse(
         total_budget=total_budget,
         total_spent=total_spent,
-        total_remaining=total_remaining,
+        total_remaining=total_budget - total_spent,
         active_creators=len(active),
     )
 
@@ -71,7 +202,7 @@ def get_brands(db: Session, active_only: bool = False) -> List[models.Brand]:
     q = db.query(models.Brand)
     if active_only:
         q = q.filter(models.Brand.is_active == True)
-    return q.order_by(models.Brand.name).all()
+    return q.order_by(_priority_rank(models.Brand.priority), models.Brand.name).all()
 
 
 def get_brand(db: Session, brand_id: int) -> Optional[models.Brand]:
@@ -79,7 +210,7 @@ def get_brand(db: Session, brand_id: int) -> Optional[models.Brand]:
 
 
 def create_brand(db: Session, data: schemas.BrandCreate) -> models.Brand:
-    brand = models.Brand(name=data.name)
+    brand = models.Brand(name=data.name, priority=data.priority)
     db.add(brand)
     db.commit()
     db.refresh(brand)
@@ -103,12 +234,15 @@ def get_tickets(
     db: Session,
     creator_name: Optional[str] = None,
     brand_name: Optional[str] = None,
+    status: Optional[str] = None,
 ) -> List[models.Ticket]:
     q = db.query(models.Ticket)
     if creator_name:
         q = q.join(models.Creator).filter(models.Creator.name.ilike(f"%{creator_name}%"))
     if brand_name:
         q = q.join(models.Brand).filter(models.Brand.name.ilike(f"%{brand_name}%"))
+    if status:
+        q = q.filter(models.Ticket.status == status)
     return q.order_by(models.Ticket.upload_date.desc()).all()
 
 
@@ -116,8 +250,9 @@ def get_ticket(db: Session, ticket_id: int) -> Optional[models.Ticket]:
     return db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
 
 
-def create_ticket_transactional(
+def create_ticket(
     db: Session,
+    *,
     creator: models.Creator,
     brand: models.Brand,
     amount: float,
@@ -125,26 +260,62 @@ def create_ticket_transactional(
     file_path: str,
     mime_type: str,
     notes: Optional[str],
+    status: str,
+    actor_user_id: int,
 ) -> models.Ticket:
-    if creator.remaining_budget < amount:
-        raise ValueError(
-            f"Fondos insuficientes. Presupuesto restante: ${creator.remaining_budget:,.2f}, "
-            f"pero el ticket requiere: ${amount:,.2f}."
-        )
-
-    creator.spent_budget += amount
-    creator.remaining_budget = creator.initial_budget - creator.spent_budget
+    """Crea un ticket asignado a su ciclo (por fecha de subida, hoy). Si nace
+    `aprobado` (tickets de admin/superadmin, R10) descuenta de inmediato del
+    ciclo — sin validar fondos: los ciclos pueden quedar en negativo a propósito
+    (decisión del usuario, doc/mejoras-diseno-fase1.md §0.B)."""
+    cycle = get_or_create_cycle_for_date(db, creator, date.today())
 
     ticket = models.Ticket(
         creator_id=creator.id,
         brand_id=brand.id,
+        budget_cycle_id=cycle.id,
         amount=amount,
         file_name=file_name,
         file_path=file_path,
         mime_type=mime_type,
         notes=notes,
+        status=status,
     )
+
+    if status == models.TicketStatus.APROBADO.value:
+        cycle.spent += amount
+        ticket.reviewed_by_user_id = actor_user_id
+        ticket.reviewed_at = datetime.now(timezone.utc)
+
     db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
+    return ticket
+
+
+def approve_ticket(db: Session, ticket: models.Ticket, actor_user_id: int) -> models.Ticket:
+    """Aprueba un ticket pendiente: descuenta incondicionalmente del ciclo
+    asignado (puede quedar en negativo, decisión del usuario)."""
+    cycle = ticket.budget_cycle
+    if cycle is None:
+        cycle = get_or_create_cycle_for_date(db, ticket.creator, date.today())
+        ticket.budget_cycle_id = cycle.id
+
+    cycle.spent += ticket.amount
+    ticket.status = models.TicketStatus.APROBADO.value
+    ticket.reviewed_by_user_id = actor_user_id
+    ticket.reviewed_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(ticket)
+    return ticket
+
+
+def reject_ticket(
+    db: Session, ticket: models.Ticket, reason: str, actor_user_id: int
+) -> models.Ticket:
+    ticket.status = models.TicketStatus.RECHAZADO.value
+    ticket.rejection_reason = reason
+    ticket.reviewed_by_user_id = actor_user_id
+    ticket.reviewed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(ticket)
     return ticket
@@ -155,24 +326,30 @@ def get_brand_spend_breakdown(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
 ) -> List[schemas.BrandSpendItem]:
-    q = (
-        db.query(
-            models.Brand.name.label("brand_name"),
-            func.coalesce(func.sum(models.Ticket.amount), 0.0).label("total_spent"),
-        )
-        .outerjoin(models.Ticket, models.Brand.id == models.Ticket.brand_id)
-    )
+    # Solo cuentan tickets aprobados (R10); el filtro va en el ON del join (no en
+    # el WHERE) para que las marcas sin gasto en el rango sigan apareciendo con $0.
+    join_conditions = [
+        models.Brand.id == models.Ticket.brand_id,
+        models.Ticket.status == models.TicketStatus.APROBADO.value,
+    ]
     if start_date:
-        q = q.filter(models.Ticket.upload_date >= start_date)
+        join_conditions.append(models.Ticket.upload_date >= start_date)
     if end_date:
-        q = q.filter(models.Ticket.upload_date <= end_date)
+        join_conditions.append(models.Ticket.upload_date <= end_date)
+
+    q = db.query(
+        models.Brand.name.label("brand_name"),
+        models.Brand.priority.label("priority"),
+        func.coalesce(func.sum(models.Ticket.amount), 0.0).label("total_spent"),
+    ).outerjoin(models.Ticket, and_(*join_conditions))
+
     rows = (
-        q.group_by(models.Brand.id, models.Brand.name)
+        q.group_by(models.Brand.id, models.Brand.name, models.Brand.priority)
         .order_by(func.sum(models.Ticket.amount).desc())
         .all()
     )
     return [
-        schemas.BrandSpendItem(brand_name=r.brand_name, total_spent=float(r.total_spent))
+        schemas.BrandSpendItem(brand_name=r.brand_name, total_spent=float(r.total_spent), priority=r.priority)
         for r in rows
     ]
 
@@ -187,7 +364,7 @@ def get_monthly_spend(
         func.strftime("%Y-%m", models.Ticket.upload_date).label("month"),
         func.coalesce(func.sum(models.Ticket.amount), 0.0).label("total"),
         func.count(models.Ticket.id).label("count"),
-    )
+    ).filter(models.Ticket.status == models.TicketStatus.APROBADO.value)
     if start_date:
         q = q.filter(models.Ticket.upload_date >= start_date)
     if end_date:
@@ -206,12 +383,12 @@ def get_monthly_spend(
 def get_creator_usage(
     db: Session, start_date: Optional[date] = None, end_date: Optional[date] = None
 ) -> List[schemas.CreatorUsageItem]:
-    ticket_spent = (
-        db.query(
-            models.Ticket.creator_id,
-            func.coalesce(func.sum(models.Ticket.amount), 0.0).label("spent"),
-        )
-    )
+    """El denominador ('initial_budget' del schema) ahora es el monto del ciclo
+    vigente de cada creador (R7), no un presupuesto histórico acumulado."""
+    ticket_spent = db.query(
+        models.Ticket.creator_id,
+        func.coalesce(func.sum(models.Ticket.amount), 0.0).label("spent"),
+    ).filter(models.Ticket.status == models.TicketStatus.APROBADO.value)
     if start_date:
         ticket_spent = ticket_spent.filter(models.Ticket.upload_date >= start_date)
     if end_date:
@@ -219,27 +396,27 @@ def get_creator_usage(
     ticket_spent = ticket_spent.group_by(models.Ticket.creator_id).subquery()
 
     rows = (
-        db.query(
-            models.Creator.id.label("creator_id"),
-            models.Creator.name,
-            models.Creator.initial_budget,
-            func.coalesce(ticket_spent.c.spent, 0.0).label("spent"),
-        )
+        db.query(models.Creator, func.coalesce(ticket_spent.c.spent, 0.0).label("spent"))
         .outerjoin(ticket_spent, models.Creator.id == ticket_spent.c.creator_id)
         .filter(models.Creator.is_active == True)
-        .order_by(func.coalesce(ticket_spent.c.spent, 0.0).desc())
         .all()
     )
-    return [
-        schemas.CreatorUsageItem(
-            creator_id=r.creator_id,
-            name=r.name,
-            spent=float(r.spent),
-            initial_budget=float(r.initial_budget),
-            percentage=round((float(r.spent) / float(r.initial_budget)) * 100, 1) if r.initial_budget > 0 else 0.0,
+
+    items = []
+    for creator, spent in rows:
+        cycle = get_or_create_cycle_for_date(db, creator, date.today())
+        budget = cycle.amount
+        items.append(
+            schemas.CreatorUsageItem(
+                creator_id=creator.id,
+                name=creator.name,
+                spent=float(spent),
+                initial_budget=float(budget),
+                percentage=round((float(spent) / budget) * 100, 1) if budget > 0 else 0.0,
+            )
         )
-        for r in rows
-    ]
+    items.sort(key=lambda i: i.spent, reverse=True)
+    return items
 
 
 def get_dashboard_summary(
@@ -248,7 +425,7 @@ def get_dashboard_summary(
     q = db.query(
         func.coalesce(func.sum(models.Ticket.amount), 0.0),
         func.count(models.Ticket.id),
-    )
+    ).filter(models.Ticket.status == models.TicketStatus.APROBADO.value)
     if start_date:
         q = q.filter(models.Ticket.upload_date >= start_date)
     if end_date:
@@ -259,6 +436,7 @@ def get_dashboard_summary(
         db.query(func.count(func.distinct(models.Brand.id)))
         .filter(models.Brand.is_active == True)
         .join(models.Ticket, models.Brand.id == models.Ticket.brand_id)
+        .filter(models.Ticket.status == models.TicketStatus.APROBADO.value)
     )
     if start_date:
         active_brands = active_brands.filter(models.Ticket.upload_date >= start_date)

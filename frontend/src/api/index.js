@@ -101,10 +101,10 @@ export function resetUserPassword(id) {
   return request(`/users/${id}/reset-password`, { method: "POST" });
 }
 
-export function setUserActive(id, isActive, confirmUsername) {
+export function setUserActive(id, isActive) {
   return request(`/users/${id}/estado`, {
     method: "PATCH",
-    body: JSON.stringify({ is_active: isActive, confirm_username: confirmUsername || null }),
+    body: JSON.stringify({ is_active: isActive }),
   });
 }
 
@@ -133,6 +133,10 @@ export function updateCreator(id, data) {
   });
 }
 
+export function fetchCreatorCycles(id) {
+  return request(`/creators/${id}/ciclos`);
+}
+
 /* ── Brands ──────────────────────────────────────────────────────────────── */
 
 export function fetchBrands(activeOnly = true) {
@@ -156,12 +160,24 @@ export function updateBrand(id, data) {
 
 /* ── Tickets ─────────────────────────────────────────────────────────────── */
 
-export function fetchTickets({ creatorName, brandName } = {}) {
+export function fetchTickets({ creatorName, brandName, status } = {}) {
   const params = new URLSearchParams();
   if (creatorName) params.set("creator_name", creatorName);
   if (brandName) params.set("brand_name", brandName);
+  if (status) params.set("status", status);
   const qs = params.toString();
   return request(`/tickets/${qs ? `?${qs}` : ""}`);
+}
+
+export function approveTicket(id) {
+  return request(`/tickets/${id}/aprobar`, { method: "POST" });
+}
+
+export function rejectTicket(id, reason) {
+  return request(`/tickets/${id}/rechazar`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export function fetchBrandSpendBreakdown(startDate, endDate) {

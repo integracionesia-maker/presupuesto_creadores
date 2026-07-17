@@ -5,11 +5,11 @@ function FullScreenSpinner() {
   return (
     <div
       className="flex min-h-screen items-center justify-center"
-      style={{ background: "var(--go-dark-900)" }}
+      style={{ background: "var(--go-bg)" }}
     >
       <div
         className="h-10 w-10 animate-spin rounded-full border-[3px]"
-        style={{ borderColor: "var(--go-dark-600)", borderTopColor: "var(--go-orange)" }}
+        style={{ borderColor: "var(--go-border)", borderTopColor: "var(--go-orange)" }}
       />
     </div>
   );

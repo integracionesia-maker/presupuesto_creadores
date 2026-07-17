@@ -35,7 +35,7 @@ export default function LoginPage() {
   return (
     <div
       className="flex min-h-screen items-center justify-center px-4"
-      style={{ background: "var(--go-dark-900)" }}
+      style={{ background: "var(--go-bg)" }}
     >
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
@@ -48,11 +48,11 @@ export default function LoginPage() {
           <div className="text-center">
             <h1
               className="font-display text-lg font-bold uppercase tracking-[0.06em]"
-              style={{ color: "var(--go-white)" }}
+              style={{ color: "var(--go-text-primary)" }}
             >
               Control de Presupuestos
             </h1>
-            <p className="font-body text-xs" style={{ color: "var(--go-gray-2)" }}>
+            <p className="font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
               Creadores de Contenido — Grupo Ortiz
             </p>
           </div>

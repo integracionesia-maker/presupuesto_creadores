@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import CreatorList from "./components/CreatorList";
 import TransactionTable from "./components/TransactionTable";
 import AdminView from "./components/AdminView";
+import ValidationQueue from "./components/ValidationQueue";
 import UploadTicketModal from "./components/UploadTicketModal";
 import ProtectedRoute from "./components/ProtectedRoute";
 import HomePage from "./pages/HomePage";
@@ -12,7 +14,7 @@ import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 import { useAuth } from "./context/AuthContext";
-import { fetchCreators, fetchCreatorsKpi, fetchBrands } from "./api";
+import { fetchCreators, fetchCreatorsKpi, fetchBrands, fetchTickets } from "./api";
 
 const ADMIN_ROLES = ["admin", "superadmin"];
 
@@ -31,13 +33,13 @@ function LoadingSpinner() {
       <div
         className="h-10 w-10 animate-spin rounded-full border-[3px]"
         style={{
-          borderColor: "var(--go-dark-600)",
+          borderColor: "var(--go-border)",
           borderTopColor: "var(--go-orange)",
         }}
       />
       <span
         className="ml-3 font-body text-sm"
-        style={{ color: "var(--go-gray-2)" }}
+        style={{ color: "var(--go-text-secondary)" }}
       >
         Cargando datos...
       </span>
@@ -69,10 +71,12 @@ function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem("sidebar-collapsed") === "true"
   );
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [creators, setCreators] = useState([]);
   const [brands, setBrands] = useState([]);
   const [kpi, setKpi] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -93,14 +97,16 @@ function AppShell() {
     if (!silent) setLoading(true);
     setError(null);
     try {
-      const [c, k, b] = await Promise.all([
+      const [c, k, b, pending] = await Promise.all([
         fetchCreators(),
         isPrivileged ? fetchCreatorsKpi() : Promise.resolve(null),
         fetchBrands(false), // incluye marcas inactivas para la vista de administración
+        isPrivileged ? fetchTickets({ status: "pendiente" }) : Promise.resolve([]),
       ]);
       setCreators(c);
       setKpi(k);
       setBrands(b);
+      setPendingCount(pending.length);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -118,16 +124,20 @@ function AppShell() {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--go-dark-900)" }}>
+    <div className="min-h-screen" style={{ background: "var(--go-bg)" }}>
+      <Header onOpenMobileMenu={() => setMobileMenuOpen(true)} />
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggle={handleToggleSidebar}
         onNewTicket={() => setModalOpen(true)}
+        pendingCount={pendingCount}
+        mobileOpen={mobileMenuOpen}
+        onCloseMobile={() => setMobileMenuOpen(false)}
       />
 
       <main
-        className={`min-h-screen transition-all duration-300 ${
-          sidebarCollapsed ? "ml-16" : "ml-16 sm:ml-60"
+        className={`min-h-screen pt-16 transition-all duration-300 ${
+          sidebarCollapsed ? "md:ml-16" : "md:ml-60"
         }`}
       >
         <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -195,6 +205,14 @@ function AppShell() {
                       onChange={() => loadData({ silent: true })}
                     />
                   )}
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/validacion"
+              element={
+                <ProtectedRoute roles={ADMIN_ROLES}>
+                  <ValidationQueue onChange={() => loadData({ silent: true })} />
                 </ProtectedRoute>
               }
             />

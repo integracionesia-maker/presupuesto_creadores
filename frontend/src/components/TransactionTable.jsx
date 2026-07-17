@@ -1,7 +1,16 @@
 import { useState, useEffect, useMemo } from "react";
-import { fetchTickets, ticketFileUrl } from "../api";
+import { fetchTickets } from "../api";
+import { PRIORITY_BADGE_CLASS, PRIORITY_LABELS } from "../utils/priority";
+import MediaViewerModal from "./MediaViewerModal";
 
 const PAGE_SIZES = [10, 25, 50, 100];
+
+const STATUS_LABELS = { pendiente: "Pendiente", aprobado: "Aprobado", rechazado: "Rechazado" };
+const STATUS_BADGE_CLASS = {
+  pendiente: "go-badge-warning",
+  aprobado: "go-badge-success",
+  rechazado: "go-badge-error",
+};
 
 /* Columnas ordenables: key = campo del ticket */
 const SORTABLE_COLUMNS = [
@@ -61,6 +70,10 @@ export default function TransactionTable({ creators, brands }) {
 
   const [filterCreator, setFilterCreator] = useState("");
   const [filterBrand, setFilterBrand] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterPriority, setFilterPriority] = useState("");
+
+  const [viewerTicket, setViewerTicket] = useState(null);
 
   /* Orden de 3 estados: null (predeterminado) → "asc" → "desc" → null */
   const [sortKey, setSortKey] = useState(null);
@@ -82,9 +95,14 @@ export default function TransactionTable({ creators, brands }) {
     setPage(1);
   };
 
+  const filteredTickets = useMemo(() => {
+    if (!filterPriority) return tickets;
+    return tickets.filter((t) => t.brand_priority === filterPriority);
+  }, [tickets, filterPriority]);
+
   const sortedTickets = useMemo(() => {
-    if (!sortKey || !sortDir) return tickets; // orden predeterminado (fecha desc, del backend)
-    const sorted = [...tickets].sort((a, b) => {
+    if (!sortKey || !sortDir) return filteredTickets; // orden predeterminado (fecha desc, del backend)
+    const sorted = [...filteredTickets].sort((a, b) => {
       let cmp;
       if (sortKey === "amount") {
         cmp = a.amount - b.amount;
@@ -98,7 +116,7 @@ export default function TransactionTable({ creators, brands }) {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [tickets, sortKey, sortDir]);
+  }, [filteredTickets, sortKey, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -117,6 +135,7 @@ export default function TransactionTable({ creators, brands }) {
     fetchTickets({
       creatorName: filterCreator || undefined,
       brandName: filterBrand || undefined,
+      status: filterStatus || undefined,
     })
       .then((data) => {
         if (!cancelled) {
@@ -134,26 +153,26 @@ export default function TransactionTable({ creators, brands }) {
     return () => {
       cancelled = true;
     };
-  }, [filterCreator, filterBrand]);
+  }, [filterCreator, filterBrand, filterStatus]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2
           className="font-display text-lg font-bold uppercase tracking-[0.06em]"
-          style={{ color: "var(--go-white)" }}
+          style={{ color: "var(--go-text-primary)" }}
         >
           Historial de Transacciones
         </h2>
         <span className="go-eyebrow">
-          {tickets.length} registros
+          {sortedTickets.length} registros
         </span>
       </div>
 
       {/* ── Filters ──────────────────────────────────────────────────── */}
       <div
         className="flex flex-wrap gap-4 rounded-go-lg p-4"
-        style={{ background: "var(--go-dark-800)", border: "1px solid var(--go-dark-600)" }}
+        style={{ background: "var(--go-surface)", border: "1px solid var(--go-border)" }}
       >
         <div className="min-w-[200px] flex-1">
           <label className="go-eyebrow mb-1.5 block">Filtrar por Creador</label>
@@ -171,7 +190,7 @@ export default function TransactionTable({ creators, brands }) {
               stroke="currentColor"
               strokeWidth={2}
               viewBox="0 0 24 24"
-              style={{ color: "var(--go-gray-1)" }}
+              style={{ color: "var(--go-text-muted)" }}
             >
               <path
                 strokeLinecap="round"
@@ -182,7 +201,7 @@ export default function TransactionTable({ creators, brands }) {
           </div>
         </div>
 
-        <div className="min-w-[200px] flex-1">
+        <div className="min-w-[180px] flex-1">
           <label className="go-eyebrow mb-1.5 block">Filtrar por Marca</label>
           <select
             value={filterBrand}
@@ -195,6 +214,34 @@ export default function TransactionTable({ creators, brands }) {
                 {b.name}
               </option>
             ))}
+          </select>
+        </div>
+
+        <div className="min-w-[160px]">
+          <label className="go-eyebrow mb-1.5 block">Prioridad</label>
+          <select
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
+            className="go-select"
+          >
+            <option value="">Todas</option>
+            <option value="alta">Alta</option>
+            <option value="media">Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+
+        <div className="min-w-[160px]">
+          <label className="go-eyebrow mb-1.5 block">Estado</label>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="go-select"
+          >
+            <option value="">Todos</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="aprobado">Aprobado</option>
+            <option value="rechazado">Rechazado</option>
           </select>
         </div>
       </div>
@@ -219,13 +266,13 @@ export default function TransactionTable({ creators, brands }) {
           <div
             className="h-8 w-8 animate-spin rounded-full border-[3px]"
             style={{
-              borderColor: "var(--go-dark-600)",
+              borderColor: "var(--go-border)",
               borderTopColor: "var(--go-orange)",
             }}
           />
           <span
             className="ml-3 font-body text-sm"
-            style={{ color: "var(--go-gray-2)" }}
+            style={{ color: "var(--go-text-secondary)" }}
           >
             Cargando transacciones...
           </span>
@@ -233,10 +280,10 @@ export default function TransactionTable({ creators, brands }) {
       )}
 
       {/* ── Empty state ───────────────────────────────────────────────── */}
-      {!loading && tickets.length === 0 && (
+      {!loading && sortedTickets.length === 0 && (
         <div
           className="flex flex-col items-center justify-center py-16 font-body text-sm"
-          style={{ color: "var(--go-gray-2)" }}
+          style={{ color: "var(--go-text-secondary)" }}
         >
           <svg
             className="mb-3 h-10 w-10"
@@ -256,10 +303,10 @@ export default function TransactionTable({ creators, brands }) {
       )}
 
       {/* ── Table ─────────────────────────────────────────────────────── */}
-      {!loading && tickets.length > 0 && (
+      {!loading && sortedTickets.length > 0 && (
         <div
           className="overflow-x-auto rounded-go-lg border"
-          style={{ borderColor: "var(--go-dark-600)" }}
+          style={{ borderColor: "var(--go-border)" }}
         >
           <table className="go-table">
             <thead>
@@ -288,36 +335,47 @@ export default function TransactionTable({ creators, brands }) {
                     </th>
                   );
                 })}
+                <th className="text-center">Estado</th>
                 <th className="text-center">Comprobante</th>
               </tr>
             </thead>
             <tbody>
               {pageTickets.map((t) => (
                 <tr key={t.id}>
-                  <td style={{ color: "var(--go-gray-2)" }}>
+                  <td style={{ color: "var(--go-text-secondary)" }}>
                     {formatDate(t.upload_date)}
                   </td>
                   <td>
                     <span
                       className="font-display text-sm font-semibold"
-                      style={{ color: "var(--go-white)" }}
+                      style={{ color: "var(--go-text-primary)" }}
                     >
                       {t.creator_name || `ID ${t.creator_id}`}
                     </span>
                   </td>
-                  <td style={{ color: "#d4d4d4" }}>
-                    {t.brand_name || `ID ${t.brand_id}`}
+                  <td style={{ color: "var(--go-text-primary)" }}>
+                    <div className="flex items-center gap-2">
+                      <span>{t.brand_name || `ID ${t.brand_id}`}</span>
+                      {t.brand_priority && (
+                        <span className={`go-badge ${PRIORITY_BADGE_CLASS[t.brand_priority] || "go-badge-warning"}`}>
+                          {PRIORITY_LABELS[t.brand_priority] || t.brand_priority}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="num text-right font-semibold" style={{ color: "var(--go-warning)" }}>
                     {formatCurrency(t.amount)}
                   </td>
                   <td className="text-center">
-                    <a
-                      href={ticketFileUrl(t.id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn-go-ghost text-xs px-3 py-1.5"
+                    <span
+                      className={`go-badge ${STATUS_BADGE_CLASS[t.status] || "go-badge-warning"}`}
+                      title={t.status === "rechazado" && t.rejection_reason ? `Motivo: ${t.rejection_reason}` : undefined}
                     >
+                      {STATUS_LABELS[t.status] || t.status}
+                    </span>
+                  </td>
+                  <td className="text-center">
+                    <button onClick={() => setViewerTicket(t)} className="btn-go-ghost text-xs px-3 py-1.5">
                       <svg
                         className="h-3.5 w-3.5"
                         fill="none"
@@ -337,7 +395,7 @@ export default function TransactionTable({ creators, brands }) {
                         />
                       </svg>
                       Ver
-                    </a>
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -347,16 +405,16 @@ export default function TransactionTable({ creators, brands }) {
           {/* ── Pagination footer ─────────────────────────────────────── */}
           <div
             className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-            style={{ borderTop: "1px solid var(--go-dark-600)" }}
+            style={{ borderTop: "1px solid var(--go-border)" }}
           >
-            <span className="font-body text-xs" style={{ color: "var(--go-gray-2)" }}>
+            <span className="font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
               Mostrando {rangeStart}–{rangeEnd} de {sortedTickets.length}
             </span>
 
             <div className="flex flex-wrap items-center gap-3">
               <label
                 className="font-body text-xs"
-                style={{ color: "var(--go-gray-2)" }}
+                style={{ color: "var(--go-text-secondary)" }}
               >
                 Filas por página
               </label>
@@ -388,7 +446,7 @@ export default function TransactionTable({ creators, brands }) {
                 </button>
                 <span
                   className="font-body text-xs tabular-nums"
-                  style={{ color: "var(--go-gray-2)" }}
+                  style={{ color: "var(--go-text-secondary)" }}
                 >
                   Página {currentPage} de {totalPages}
                 </span>
@@ -407,6 +465,8 @@ export default function TransactionTable({ creators, brands }) {
           </div>
         </div>
       )}
+
+      {viewerTicket && <MediaViewerModal ticket={viewerTicket} onClose={() => setViewerTicket(null)} />}
     </div>
   );
 }

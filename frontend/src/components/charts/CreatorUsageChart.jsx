@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import Chart from "react-apexcharts";
 import { createApexOptions, GO_CHART_COLORS } from "./apexTheme";
+import { useTheme } from "../../context/ThemeContext";
 
 function usageColor(pct) {
   if (pct >= 90) return "#E53E3E"; // go-error
@@ -8,7 +9,9 @@ function usageColor(pct) {
   return "#00A36E"; // go-success
 }
 
-export default function CreatorUsageChart({ data }) {
+export default function CreatorUsageChart({ data, forceTheme }) {
+  const { theme: ctxTheme } = useTheme();
+  const theme = forceTheme || ctxTheme;
   const options = useMemo(() => {
     const items = (data || []).filter((d) => d.spent > 0);
     return createApexOptions({
@@ -22,7 +25,7 @@ export default function CreatorUsageChart({ data }) {
       },
       xaxis: {
         categories: items.map((d) => d.name),
-        title: { text: "% del presupuesto utilizado", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-gray-2)" } },
+        title: { text: "% del presupuesto utilizado", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-text-secondary)" } },
         labels: { formatter: (v) => `${v}%` },
         max: 100,
       },
@@ -44,8 +47,8 @@ export default function CreatorUsageChart({ data }) {
       },
       legend: { show: false },
       grid: { xaxis: { lines: { show: true } }, yaxis: { lines: { show: false } } },
-    });
-  }, [data]);
+    }, theme);
+  }, [data, theme]);
 
   const series = useMemo(() => {
     const items = (data || []).filter((d) => d.spent > 0);
@@ -70,13 +73,13 @@ export default function CreatorUsageChart({ data }) {
 
   if (!data || data.length === 0 || series.length === 0 || series[0].data.length === 0) {
     return (
-      <p className="py-10 text-center font-body text-sm" style={{ color: "var(--go-gray-2)" }}>
+      <p className="py-10 text-center font-body text-sm" style={{ color: "var(--go-text-secondary)" }}>
         Sin datos de uso de presupuesto.
       </p>
     );
   }
 
   return (
-    <Chart options={options} series={series} type="bar" height={320} width="100%" />
+    <Chart key={theme} options={options} series={series} type="bar" height={320} width="100%" />
   );
 }

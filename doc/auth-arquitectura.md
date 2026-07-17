@@ -1,6 +1,8 @@
 # Arquitectura del sistema de autenticación, usuarios, roles y permisos
 
-> Diseño final implementado (Fases 2-3 completas: código en `dami-branch`, 90 pruebas pytest + 5 E2E Playwright en verde). Complementa — y en algunos puntos corrige — el diseño preliminar de `doc/auth-diseno-fase1.md`.
+> Diseño final implementado (Fases 2-3 completas: código en `dami-branch`, 119 pruebas pytest + 16 E2E Playwright en verde). Complementa — y en algunos puntos corrige — el diseño preliminar de `doc/auth-diseno-fase1.md`.
+>
+> **Actualizado por el paquete R1-R11** (`doc/prompt-mejoras-integrales.md`): la matriz de permisos cambió (R4-R6, ver §3.1) y se agregaron endpoints nuevos (ciclos de presupuesto, validación de tickets). Reglas de negocio completas de esa parte en `doc/presupuestos-y-validacion.md`.
 
 ---
 
@@ -54,14 +56,33 @@ erDiagram
 
 ## 3. Matriz de permisos
 
-Sin cambios respecto al diseño de Fase 1 (`doc/auth-diseno-fase1.md` §2), verificada por la suite de pruebas (`backend/tests/test_permissions.py`, `test_users_management.py`). Resumen de las reglas que más importan:
+### 3.1 Cambios del paquete R1-R11 (R4-R6) — reemplazan lo descrito en `auth-diseno-fase1.md`
+
+**R4 — Gestión de usuarios ahora es exclusiva de `superadmin`.** Antes, un `admin` podía gestionar usuarios `role=creador` (y su propia fila). Eso se eliminó: **todo** `/api/users/*` ahora exige `require_role("superadmin")` — un `admin` recibe `403` en cualquier endpoint de usuarios, y la pestaña "Usuarios" ni siquiera se renderiza para su rol en `AdminView.jsx`/`Sidebar.jsx`. La lógica de auto-desactivación con confirmación (`_ensure_can_manage_target`, "escribe tu usuario para confirmar") quedó **eliminada por completo** — era inalcanzable una vez que solo superadmin entra a esos endpoints y superadmin nunca puede apuntarse a sí mismo (`_ensure_not_superadmin_target` ya lo bloqueaba).
+
+**R5 — El alcance del `admin` en TODO lo demás se mantiene/amplía**: dashboard global, creadores, marcas, transacciones de todos, administración de creadores/marcas, asignación de presupuestos por ciclo, validación de tickets, descarga del PDF. Solo pierde acceso a usuarios (R4).
+
+**R6 — El alcance del `creador` se mantiene sin cambios de fondo**, pero ahora incluye más superficie a auditar: no ve el histórico de ciclos de otro creador (`GET /api/creators/{id}/ciclos` → 403 si `creator_id` no es el suyo), no ve la bandeja de Validación (ruta y endpoints `aprobar`/`rechazar` con `require_role("admin", "superadmin")`), y sus tickets propios siempre nacen `pendiente` (nunca auto-aprueban, a diferencia de los de admin/superadmin).
+
+Endpoints nuevos de este paquete (matriz completa, ver `doc/presupuestos-y-validacion.md` para las reglas de negocio detrás):
+
+| Endpoint | Rol requerido | Notas |
+|---|---|---|
+| `GET /api/creators/{id}/ciclos` | Cualquiera autenticado | `creador` solo el propio (403 si no), admin/superadmin cualquiera |
+| `POST /api/tickets/{id}/aprobar` | `admin`, `superadmin` | 400 si el ticket no está `pendiente` |
+| `POST /api/tickets/{id}/rechazar` | `admin`, `superadmin` | Body `{reason}` obligatorio (422 si falta); 400 si no está `pendiente` |
+| `GET /api/tickets/?status=` | Cualquiera autenticado | Filtro adicional por estado, respeta el scoping de creador |
+| `POST/PUT /api/brands/` con `priority` | `admin`, `superadmin` | 400 si `priority` no es `alta`/`media`/`baja` |
+
+### 3.2 Reglas heredadas de la Fase 1 de autenticación (sin cambios)
+
+Verificadas por la suite de pruebas (`backend/tests/test_permissions.py`, `test_users_management.py`). Resumen de las reglas que más importan:
 
 | Regla | Detalle |
 |---|---|
 | Un `creador` solo ve su propio `Creator`/tickets | Filtrado server-side en `routers/creators.py` y `routers/tickets.py`, ignora intentos de filtrar por otro nombre |
 | `GET /api/tickets/file/{id}` | 403 si el ticket no es del creador autenticado — corrige el IDOR original (antes, cualquiera con el ID podía descargar cualquier comprobante) |
 | `POST /api/tickets/` | 403 si un creador intenta crear el ticket a nombre de otro `creator_id` |
-| `admin` | Gestiona solo usuarios `role=creador`, **más su propia fila** (puede autodesactivarse, no editarse — eso es `/api/auth/me`) |
 | `superadmin` | Único, inmutable por API: `POST /api/users/` nunca acepta `role=superadmin`; ningún endpoint permite cambiar su `role`/`is_active` |
 | `/uploads` (mount estático) | Eliminado; todo archivo se sirve por `GET /api/tickets/file/{id}` (autenticado) |
 | `/docs`, `/redoc` | Deshabilitados si `ENV=production` |
@@ -98,5 +119,8 @@ Estas surgieron durante la implementación/verificación y **no** estaban en `au
 
 ## 7. Cobertura de pruebas
 
-- **Backend (pytest)**: `backend/tests/` — 90 pruebas. `test_auth.py` (login, bloqueo, rate limit, cambio de contraseña, refresh/rotación/reuso, logout), `test_permissions.py` (401 sin token en 26 endpoints, matriz por rol, IDOR de tickets), `test_users_management.py` (alcance de admin, inmutabilidad de superadmin, auto-desactivación). Ejecutar: `cd backend && python -m pytest`.
-- **E2E (Playwright)**: `frontend/e2e/auth.spec.js` — flujo completo superadmin → crea admin → admin crea creador → creador ve solo lo suyo → cambio de contraseña obligatorio → logout → usuario desactivado no puede entrar. Requiere un backend + frontend dedicados a pruebas (ver `doc/auth-manual-usuario.md` §Pruebas E2E) porque el proxy de Vite necesita apuntar a un backend con una DB de pruebas, no a la de desarrollo.
+- **Backend (pytest)**: `backend/tests/` — 119 pruebas. `test_auth.py` (login, bloqueo, rate limit, cambio de contraseña, refresh/rotación/reuso, logout), `test_permissions.py` (401 sin token, matriz por rol incluido R4-R6, IDOR de tickets/archivos/ciclos), `test_users_management.py` (R4: admin recibe 403 en todo `/api/users/*`, inmutabilidad de superadmin), `test_budget_cycles.py` (R7: ver `doc/presupuestos-y-validacion.md` §7), `test_ticket_validation.py` (R10, ídem), `test_brand_priority.py` (R9, ídem). Ejecutar: `cd backend && python -m pytest`.
+- **E2E (Playwright)**: dos archivos en `frontend/e2e/`:
+  - `auth.spec.js` (7 pruebas): superadmin → crea admin → admin ve dashboard/creadores pero NO usuarios (403 en la API) → superadmin vincula el usuario `creador` → creador ve solo lo suyo → usuario desactivado no puede entrar.
+  - `presupuesto-flujo-completo.spec.js` (9 pruebas): el flujo de negocio completo del paquete R1-R11 — bootstrap de admin/creador/marca, ticket pendiente sin descuento, validación con visor y rechazo motivado, re-subida y aprobación con descuento del ciclo, tema persistente, popover, PDF con contenido real, y el recorrido en 375px. Detalle de reglas en `doc/presupuestos-y-validacion.md` §7.
+  - Ambos requieren un backend + frontend dedicados a pruebas (ver `doc/auth-manual-usuario.md` §Pruebas E2E). **Nota**: el rate limit de login (30/15min por IP, §4) puede alcanzarse si se corren los dos archivos juntos en una sola invocación — se recomienda correrlos por separado (cada uno se mantiene bien por debajo del límite).

@@ -1,4 +1,6 @@
-# Manual de usuario — Autenticación y roles
+# Manual de usuario — Autenticación, roles, presupuestos y validación
+
+> Incluye los flujos del paquete R1-R11 (temas, header/popover, ciclos de presupuesto, validación de tickets, prioridad de marcas, visor de comprobantes, PDF, responsividad). Reglas de negocio detalladas en `doc/presupuestos-y-validacion.md`.
 
 ## Iniciar sesión
 
@@ -16,29 +18,62 @@ Ve a **Mi Perfil** (ícono en la barra lateral) → sección "Cambiar contraseñ
 
 | Rol | Ves en la barra lateral | Puedes hacer |
 |---|---|---|
-| **Superadministrador** | Todo | Gestionar administradores y creadores, ver el dashboard completo, configuración del sistema |
-| **Administrador** | Todo excepto configuración de superadmin | Gestionar creadores, marcas, tickets de cualquier creador, y usuarios de rol Creador |
-| **Creador** | Inicio, Transacciones, Mi Perfil | Ver y subir **solo tus propios** tickets; ver tu presupuesto en Mi Perfil |
+| **Superadministrador** | Todo, incluida "Usuarios" | Todo lo del Administrador, **más** gestionar usuarios (crear/editar/resetear contraseña/activar-desactivar) |
+| **Administrador** | Inicio, Dashboard, Creadores, Transacciones, Validación, Administración (Creadores/Marcas) | Gestionar creadores y marcas, asignar presupuestos por ciclo, validar tickets de cualquier creador, descargar el PDF del dashboard. **No** gestiona usuarios (ver más abajo) |
+| **Creador** | Inicio, Transacciones, Mi Perfil | Ver y subir **solo tus propios** tickets (nacen pendientes hasta que un admin los valide); ver tu ciclo de presupuesto en Mi Perfil |
 
 Si entras a una URL que tu rol no puede ver, te muestra una página de "Acceso no autorizado" (no un error).
 
+El **header superior** (logo + "Grupo Ortiz") es fijo y está en todas las vistas. A la derecha tiene el interruptor de tema (sol/luna) y tu foto/iniciales — haz click ahí para abrir el menú de perfil ("Mi perfil" / "Cerrar sesión"); se cierra con click afuera, con `Escape`, o al navegar. En pantallas angostas (celular), un ícono de hamburguesa junto al logo abre el menú lateral como un panel deslizable.
+
+## Tema claro/oscuro
+
+El botón de sol/luna en el header cambia el tema al instante, sin parpadeo al recargar la página. Tu elección se guarda en el navegador (no en el servidor) y se mantiene entre sesiones. Aplica a toda la app, incluidas las gráficas del dashboard.
+
 ---
 
-## Para Superadmin y Administradores: gestión de usuarios
+## Para Superadmin: gestión de usuarios
 
-En **Administración → Usuarios**:
+**Solo el superadministrador** ve y usa **Administración → Usuarios** — un administrador que intente entrar a esos endpoints directamente recibe acceso denegado, y la pestaña ni siquiera aparece en su vista.
 
-- **Crear usuario**: botón "Nuevo Usuario". Si el rol es "Creador", debes vincularlo a un Creador ya existente (créalo primero en la pestaña "Creadores" si hace falta). Si no escribes una contraseña, el sistema genera una temporal — anótala, se muestra una sola vez.
+- **Crear usuario**: botón "Nuevo Usuario". Si el rol es "Creador", debes vincularlo a un Creador ya existente (créalo primero en Administración → Creadores si hace falta — eso sí lo puede hacer un administrador). Si no escribes una contraseña, el sistema genera una temporal — anótala, se muestra una sola vez.
 - **Resetear contraseña**: genera una nueva contraseña temporal para ese usuario (debe cambiarla en su próximo login). También se muestra una sola vez — compártela por un canal seguro (no por correo sin cifrar ni chat público).
-- **Activar/Desactivar**: una cuenta desactivada no puede iniciar sesión. Para desactivar **tu propia cuenta de administrador**, el sistema te pide escribir tu usuario como confirmación, para evitar un bloqueo accidental.
+- **Activar/Desactivar**: una cuenta desactivada no puede iniciar sesión.
 
-Un administrador **no puede** crear, ver ni editar a otro administrador ni al superadmin — solo el superadmin gestiona administradores. La cuenta superadmin no se puede desactivar ni degradar desde ningún lugar de la app (es intencional: es la única cuenta de ese tipo).
+La cuenta superadmin no se puede desactivar ni degradar desde ningún lugar de la app (es intencional: es la única cuenta de ese tipo).
+
+## Para Admin/Superadmin: presupuestos por ciclo
+
+En **Administración → Creadores**, al crear o editar un creador defines:
+- **Monto del ciclo**: el presupuesto que se renueva automáticamente cada periodo.
+- **Periodicidad**: Semanal (lunes a domingo) o Mensual (calendario).
+
+El ciclo se renueva solo (no hay que hacer nada manualmente) y **no acumula sobrante** — lo que no se gastó en un ciclo no pasa al siguiente. Si cambias el monto o la periodicidad, **el ciclo en curso no se toca**; el cambio aplica desde el próximo ciclo. Cada creador muestra su ciclo vigente (gastado/restante/días que quedan) en la tabla de Creadores, y el botón "Histórico" abre sus ciclos pasados con los montos de cada uno.
+
+Un ciclo **puede quedar en negativo** si apruebas tickets que superan el restante — la app te avisa con una advertencia, pero nunca te bloquea; la decisión final siempre es tuya.
+
+## Para Admin/Superadmin: validar tickets de creadores
+
+Los tickets que sube un **creador** nacen **pendientes** y no descuentan nada hasta que los revisas en **Validación** (un badge junto a ese ítem del menú muestra cuántos hay pendientes). Ahí, por cada ticket puedes:
+- **Ver**: abre el comprobante (imagen con zoom o PDF) sin descargarlo.
+- **Aprobar**: descuenta del ciclo del creador correspondiente a la fecha en que subió el ticket (no la fecha en que lo apruebas — si tardaste semanas en revisarlo, se descuenta del ciclo original, no del vigente hoy).
+- **Rechazar**: debes escribir un motivo; el creador lo verá junto a su ticket rechazado y puede volver a subirlo.
+
+Los tickets que sube un **admin o superadmin** (a nombre de cualquier creador) se aprueban y descuentan automáticamente — el flujo de validación es solo para lo que sube un creador sobre sí mismo.
+
+## Prioridad de marcas
+
+Cada marca tiene una prioridad — **Alta**, **Media** (default) o **Baja** — que editas en Administración → Marcas. Se ve como una etiqueta de color en Transacciones, Validación y el desglose del dashboard, y las marcas de mayor prioridad aparecen primero en listados y selectores.
+
+## Reporte en PDF del dashboard
+
+Botón "Descargar PDF" en el Dashboard (solo admin/superadmin): genera un PDF con los KPIs, las gráficas y las tablas de desglose (por marca y por creador) tal como se ven en pantalla, con branding de Grupo Ortiz, para el período que tengas seleccionado en el filtro de fechas (incluye los atajos "Este mes", "Mes pasado", etc., o un rango personalizado).
 
 ## Para Creadores: tu presupuesto y tickets
 
-- **Mi Perfil** muestra tu presupuesto inicial, lo gastado y lo restante.
-- **Nuevo Ticket** (botón naranja de la barra lateral): tu nombre ya viene preseleccionado y no se puede cambiar — solo puedes registrar gastos a tu propio nombre.
-- **Transacciones** muestra únicamente tus propios tickets, aunque uses el buscador.
+- **Mi Perfil** muestra tu ciclo de presupuesto vigente: periodicidad, fechas del ciclo actual, monto, gastado y restante.
+- **Nuevo Ticket** (botón naranja de la barra lateral): tu nombre ya viene preseleccionado y no se puede cambiar — solo puedes registrar gastos a tu propio nombre. Tu ticket queda **pendiente de validación** — no se descuenta de tu presupuesto hasta que un administrador lo apruebe.
+- **Transacciones** muestra únicamente tus propios tickets, con su estado (Pendiente/Aprobado/Rechazado). Si uno fue rechazado, el motivo aparece al pasar el cursor sobre la etiqueta — puedes volver a subir el ticket corregido como uno nuevo.
 
 ## Si perdiste el acceso
 
@@ -71,8 +106,11 @@ JWT_SECRET_KEY=e2e-test-secret-0123456789abcdef ENV=development DATABASE_URL=sql
 cd frontend
 VITE_BACKEND_PORT=8793 npx vite --host 127.0.0.1 --port 5175
 
-# Terminal 3 — la suite
+# Terminal 3 — la suite (los dos archivos por separado, ver nota de rate-limit abajo)
 cd frontend
-E2E_SUPERADMIN_PASSWORD="SuperClaveE2E123!" E2E_BASE_URL="http://127.0.0.1:5175" npx playwright test
+E2E_SUPERADMIN_PASSWORD="SuperClaveE2E123!" E2E_BASE_URL="http://127.0.0.1:5175" npx playwright test e2e/auth.spec.js
+E2E_SUPERADMIN_PASSWORD="SuperClaveE2E123!" E2E_BASE_URL="http://127.0.0.1:5175" npx playwright test e2e/presupuesto-flujo-completo.spec.js
 ```
 Borra `backend/test_e2e.db` antes de repetir el flujo completo desde cero (el superadmin es idempotente, pero los usuarios/creadores que crea la prueba no lo son entre corridas con la misma base).
+
+**Nota sobre el rate limit de login**: el backend limita a 30 intentos de login por IP cada 15 minutos (defensa contra fuerza bruta, ver `doc/auth-arquitectura.md` §4). Cada archivo de la suite se mantiene bien por debajo de eso, pero si el superadmin ya no tiene la contraseña sembrada (por ejemplo, porque `auth.spec.js` la cambió en una corrida anterior en la misma DB), usa `python reset_superadmin_password.py --password "..."` antes de repetir.

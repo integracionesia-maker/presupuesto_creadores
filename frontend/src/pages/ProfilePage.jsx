@@ -109,11 +109,11 @@ export default function ProfilePage() {
       <div>
         <h2
           className="font-display text-lg font-bold uppercase tracking-[0.06em]"
-          style={{ color: "var(--go-white)" }}
+          style={{ color: "var(--go-text-primary)" }}
         >
           Mi Perfil
         </h2>
-        <p className="mt-1 font-body text-sm" style={{ color: "var(--go-gray-2)" }}>
+        <p className="mt-1 font-body text-sm" style={{ color: "var(--go-text-secondary)" }}>
           {ROLE_LABELS[user.role] || user.role}
         </p>
       </div>
@@ -126,35 +126,43 @@ export default function ProfilePage() {
 
       {user.role === "creador" && ownBudget && (
         <div className="go-card space-y-3">
-          <span className="go-eyebrow">Mi presupuesto</span>
+          <div className="flex items-center justify-between">
+            <span className="go-eyebrow">Mi ciclo de presupuesto</span>
+            <span className="font-body text-xs capitalize" style={{ color: "var(--go-text-secondary)" }}>
+              {ownBudget.cycle_period === "semanal" ? "Semanal" : "Mensual"}
+              {ownBudget.cycle_start_date && ownBudget.cycle_end_date
+                ? ` · ${ownBudget.cycle_start_date} a ${ownBudget.cycle_end_date}`
+                : ""}
+            </span>
+          </div>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <p className="font-body text-xs" style={{ color: "var(--go-gray-2)" }}>
-                Inicial
+              <p className="font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
+                Monto del ciclo
               </p>
-              <p className="num font-display text-base font-bold" style={{ color: "var(--go-white)" }}>
-                {formatCurrency(ownBudget.initial_budget)}
+              <p className="num font-display text-base font-bold" style={{ color: "var(--go-text-primary)" }}>
+                {formatCurrency(ownBudget.cycle_amount ?? 0)}
               </p>
             </div>
             <div>
-              <p className="font-body text-xs" style={{ color: "var(--go-gray-2)" }}>
+              <p className="font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
                 Gastado
               </p>
               <p className="num font-display text-base font-bold" style={{ color: "var(--go-warning)" }}>
-                {formatCurrency(ownBudget.spent_budget)}
+                {formatCurrency(ownBudget.cycle_spent ?? 0)}
               </p>
             </div>
             <div>
-              <p className="font-body text-xs" style={{ color: "var(--go-gray-2)" }}>
+              <p className="font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
                 Restante
               </p>
               <p
                 className="num font-display text-base font-bold"
                 style={{
-                  color: ownBudget.remaining_budget <= 0 ? "var(--go-error)" : "var(--go-success)",
+                  color: (ownBudget.cycle_remaining ?? 0) <= 0 ? "var(--go-error)" : "var(--go-success)",
                 }}
               >
-                {formatCurrency(ownBudget.remaining_budget)}
+                {formatCurrency(ownBudget.cycle_remaining ?? 0)}
               </p>
             </div>
           </div>

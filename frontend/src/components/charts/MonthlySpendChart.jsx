@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import Chart from "react-apexcharts";
 import { createApexOptions, formatChartCurrency, GO_CHART_COLORS } from "./apexTheme";
+import { useTheme } from "../../context/ThemeContext";
 
 const MONTHS_ES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -13,7 +14,9 @@ function monthLabel(ym) {
   return `${MONTHS_ES[parseInt(m, 10) - 1]} ${y}`;
 }
 
-export default function MonthlySpendChart({ data }) {
+export default function MonthlySpendChart({ data, forceTheme }) {
+  const { theme: ctxTheme } = useTheme();
+  const theme = forceTheme || ctxTheme;
   const options = useMemo(() => {
     return createApexOptions({
       chart: {
@@ -22,10 +25,10 @@ export default function MonthlySpendChart({ data }) {
       },
       xaxis: {
         categories: (data || []).map((d) => monthLabel(d.month)),
-        title: { text: "Mes", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-gray-2)" } },
+        title: { text: "Mes", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-text-secondary)" } },
       },
       yaxis: {
-        title: { text: "Monto (MXN)", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-gray-2)" } },
+        title: { text: "Monto (MXN)", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-text-secondary)" } },
         labels: { formatter: formatChartCurrency },
       },
       plotOptions: {
@@ -39,14 +42,14 @@ export default function MonthlySpendChart({ data }) {
         enabled: true,
         formatter: formatChartCurrency,
         offsetY: -20,
-        style: { fontSize: "10px", colors: ["var(--go-gray-2)"] },
+        style: { fontSize: "10px", colors: ["var(--go-text-secondary)"] },
       },
       tooltip: {
         y: { formatter: (v) => `$${v.toLocaleString("es-MX", { minimumFractionDigits: 2 })}` },
       },
       colors: [GO_CHART_COLORS[1]], // turquoise
-    });
-  }, [data]);
+    }, theme);
+  }, [data, theme]);
 
   const series = useMemo(() => {
     return [
@@ -59,13 +62,13 @@ export default function MonthlySpendChart({ data }) {
 
   if (!data || data.length === 0) {
     return (
-      <p className="py-10 text-center font-body text-sm" style={{ color: "var(--go-gray-2)" }}>
+      <p className="py-10 text-center font-body text-sm" style={{ color: "var(--go-text-secondary)" }}>
         Sin transacciones en este período.
       </p>
     );
   }
 
   return (
-    <Chart options={options} series={series} type="bar" height={320} width="100%" />
+    <Chart key={theme} options={options} series={series} type="bar" height={320} width="100%" />
   );
 }

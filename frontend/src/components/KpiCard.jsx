@@ -16,12 +16,12 @@ export default function KpiCard({ title, value, subtitle, accent = "orange" }) {
       <p className="go-eyebrow">{title}</p>
       <p
         className="font-display text-[28px] font-bold tracking-tight"
-        style={{ color: "var(--go-white)" }}
+        style={{ color: "var(--go-text-primary)" }}
       >
         {value}
       </p>
       {subtitle && (
-        <p className="font-body text-xs" style={{ color: "var(--go-gray-2)" }}>
+        <p className="font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
           {subtitle}
         </p>
       )}

@@ -158,9 +158,9 @@ export default function UploadTicketModal({
       <div
         className="relative w-full max-w-lg overflow-hidden"
         style={{
-          background: "var(--go-dark-800)",
+          background: "var(--go-surface)",
           borderRadius: "var(--go-radius-lg)",
-          border: "1px solid var(--go-dark-600)",
+          border: "1px solid var(--go-border)",
           boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -168,19 +168,20 @@ export default function UploadTicketModal({
         {/* ── Header ──────────────────────────────────────────────── */}
         <div
           className="flex items-center justify-between px-6 py-4"
-          style={{ borderBottom: "1px solid var(--go-dark-600)" }}
+          style={{ borderBottom: "1px solid var(--go-border)" }}
         >
           <h2
             className="font-display text-base font-bold uppercase tracking-[0.06em]"
-            style={{ color: "var(--go-white)" }}
+            style={{ color: "var(--go-text-primary)" }}
           >
             Registrar Nuevo Ticket
           </h2>
           <button
             onClick={onClose}
             disabled={submitting}
+            aria-label="Cerrar"
             className="rounded-go p-1.5 transition-colors hover:bg-white/5"
-            style={{ color: "var(--go-gray-2)" }}
+            style={{ color: "var(--go-text-secondary)" }}
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -203,7 +204,7 @@ export default function UploadTicketModal({
               {!isCreador && <option value="">Seleccionar creador...</option>}
               {activeCreators.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} — Restante: {formatCurrency(c.remaining_budget)}
+                  {c.name} — Restante del ciclo: {formatCurrency(c.cycle_remaining ?? 0)}
                 </option>
               ))}
             </select>
@@ -233,7 +234,7 @@ export default function UploadTicketModal({
             <div className="relative">
               <span
                 className="absolute left-3.5 top-[10px] font-mono text-sm"
-                style={{ color: "var(--go-gray-2)" }}
+                style={{ color: "var(--go-text-secondary)" }}
               >
                 $
               </span>
@@ -253,16 +254,21 @@ export default function UploadTicketModal({
                 className="mt-1.5 font-body text-xs"
                 style={{
                   color:
-                    Number(amount) > selectedCreator.remaining_budget
-                      ? "var(--go-error)"
-                      : "var(--go-gray-2)",
+                    Number(amount) > (selectedCreator.cycle_remaining ?? 0)
+                      ? "var(--go-warning)"
+                      : "var(--go-text-secondary)",
                 }}
               >
-                {Number(amount) > selectedCreator.remaining_budget
-                  ? `El monto excede el presupuesto restante (${formatCurrency(selectedCreator.remaining_budget)})`
-                  : `Restante después del ticket: ${formatCurrency(
-                      selectedCreator.remaining_budget - Number(amount)
+                {Number(amount) > (selectedCreator.cycle_remaining ?? 0)
+                  ? `Atención: el monto excede el restante del ciclo (${formatCurrency(selectedCreator.cycle_remaining ?? 0)}). Se puede registrar igual.`
+                  : `Restante del ciclo después del ticket: ${formatCurrency(
+                      (selectedCreator.cycle_remaining ?? 0) - Number(amount)
                     )}`}
+              </p>
+            )}
+            {isCreador && (
+              <p className="mt-1.5 font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
+                Tu ticket quedará <strong>pendiente de validación</strong> — no descuenta presupuesto hasta que un administrador lo apruebe.
               </p>
             )}
           </div>
@@ -271,7 +277,7 @@ export default function UploadTicketModal({
           <div>
             <label className="go-eyebrow mb-1.5 block">
               Observaciones{" "}
-              <span className="font-normal normal-case tracking-normal" style={{ color: "var(--go-gray-1)" }}>
+              <span className="font-normal normal-case tracking-normal" style={{ color: "var(--go-text-muted)" }}>
                 (opcional)
               </span>
             </label>
@@ -297,12 +303,12 @@ export default function UploadTicketModal({
                   ? "var(--go-orange)"
                   : file
                   ? "rgba(0,163,110,0.3)"
-                  : "var(--go-dark-600)",
+                  : "var(--go-surface-sunken)",
                 background: dragOver
                   ? "var(--go-orange-tint)"
                   : file
                   ? "rgba(0,163,110,0.05)"
-                  : "var(--go-dark-900)",
+                  : "var(--go-bg)",
               }}
               onClick={() => fileInputRef.current?.click()}
             >
@@ -324,7 +330,7 @@ export default function UploadTicketModal({
                   >
                     {file.name}
                   </p>
-                  <p className="mt-0.5 font-body text-xs" style={{ color: "var(--go-gray-2)" }}>
+                  <p className="mt-0.5 font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
                     {(file.size / 1024).toFixed(0)} KB — Haz clic para cambiar
                   </p>
                 </div>
@@ -336,17 +342,17 @@ export default function UploadTicketModal({
                     stroke="currentColor"
                     strokeWidth={1.5}
                     viewBox="0 0 24 24"
-                    style={{ color: "var(--go-gray-1)" }}
+                    style={{ color: "var(--go-text-muted)" }}
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
-                  <p className="font-body text-sm" style={{ color: "#d4d4d4" }}>
+                  <p className="font-body text-sm" style={{ color: "var(--go-text-primary)" }}>
                     Arrastra el archivo aquí o{" "}
                     <span className="font-semibold" style={{ color: "var(--go-orange)" }}>
                       haz clic para seleccionar
                     </span>
                   </p>
-                  <p className="mt-1 font-body text-xs" style={{ color: "var(--go-gray-1)" }}>
+                  <p className="mt-1 font-body text-xs" style={{ color: "var(--go-text-muted)" }}>
                     PNG, JPG o PDF — Máx. 10 MB
                   </p>
                 </div>

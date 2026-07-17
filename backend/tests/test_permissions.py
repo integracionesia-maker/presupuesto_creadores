@@ -79,13 +79,26 @@ class TestCreatorsPermissions:
         assert len(resp.json()) == 2
 
     def test_admin_can_create_and_update_creator(self, logged_in_admin):
-        resp = logged_in_admin.post("/api/creators/", json={"name": "Nuevo", "initial_budget": 500})
+        resp = logged_in_admin.post(
+            "/api/creators/",
+            json={"name": "Nuevo", "cycle_budget_amount": 500, "cycle_period": "mensual"},
+        )
         assert resp.status_code == 201
+        assert resp.json()["cycle_amount"] == 500
         cid = resp.json()["id"]
         assert logged_in_admin.put(f"/api/creators/{cid}", json={"is_active": False}).status_code == 200
 
     def test_superadmin_can_see_kpi(self, logged_in_superadmin, creator_a):
         assert logged_in_superadmin.get("/api/creators/kpi").status_code == 200
+
+    def test_creador_cannot_see_other_creators_cycles_idor(self, logged_in_creador, creator_b):
+        assert logged_in_creador.get(f"/api/creators/{creator_b.id}/ciclos").status_code == 403
+
+    def test_creador_can_see_own_cycles(self, logged_in_creador, creator_a):
+        assert logged_in_creador.get(f"/api/creators/{creator_a.id}/ciclos").status_code == 200
+
+    def test_admin_can_see_any_creator_cycles(self, logged_in_admin, creator_a):
+        assert logged_in_admin.get(f"/api/creators/{creator_a.id}/ciclos").status_code == 200
 
 
 class TestBrandsPermissions:

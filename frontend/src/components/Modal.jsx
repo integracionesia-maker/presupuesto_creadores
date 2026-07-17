@@ -12,9 +12,9 @@ export default function Modal({ title, onClose, submitting = false, children }) 
       <div
         className="relative w-full max-w-lg overflow-hidden"
         style={{
-          background: "var(--go-dark-800)",
+          background: "var(--go-surface)",
           borderRadius: "var(--go-radius-lg)",
-          border: "1px solid var(--go-dark-600)",
+          border: "1px solid var(--go-border)",
           boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
         }}
         onClick={(e) => e.stopPropagation()}
@@ -22,19 +22,20 @@ export default function Modal({ title, onClose, submitting = false, children }) 
         {/* ── Header ──────────────────────────────────────────────── */}
         <div
           className="flex items-center justify-between px-6 py-4"
-          style={{ borderBottom: "1px solid var(--go-dark-600)" }}
+          style={{ borderBottom: "1px solid var(--go-border)" }}
         >
           <h2
             className="font-display text-base font-bold uppercase tracking-[0.06em]"
-            style={{ color: "var(--go-white)" }}
+            style={{ color: "var(--go-text-primary)" }}
           >
             {title}
           </h2>
           <button
             onClick={onClose}
             disabled={submitting}
+            aria-label="Cerrar"
             className="rounded-go p-1.5 transition-colors hover:bg-white/5"
-            style={{ color: "var(--go-gray-2)" }}
+            style={{ color: "var(--go-text-secondary)" }}
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />

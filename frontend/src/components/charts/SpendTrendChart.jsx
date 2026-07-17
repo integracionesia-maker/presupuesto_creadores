@@ -1,8 +1,11 @@
 import { useMemo } from "react";
 import Chart from "react-apexcharts";
 import { createApexOptions, formatChartCurrency, GO_CHART_COLORS } from "./apexTheme";
+import { useTheme } from "../../context/ThemeContext";
 
-export default function SpendTrendChart({ data }) {
+export default function SpendTrendChart({ data, forceTheme }) {
+  const { theme: ctxTheme } = useTheme();
+  const theme = forceTheme || ctxTheme;
   const options = useMemo(() => {
     return createApexOptions({
       chart: {
@@ -27,12 +30,12 @@ export default function SpendTrendChart({ data }) {
         type: "datetime",
         labels: {
           format: "dd MMM",
-          style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", colors: "var(--go-gray-2)" },
+          style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", colors: "var(--go-text-secondary)" },
         },
-        title: { text: "Fecha", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-gray-2)" } },
+        title: { text: "Fecha", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-text-secondary)" } },
       },
       yaxis: {
-        title: { text: "Gasto acumulado (MXN)", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-gray-2)" } },
+        title: { text: "Gasto acumulado (MXN)", style: { fontSize: "11px", fontFamily: "'Inter', sans-serif", color: "var(--go-text-secondary)" } },
         labels: { formatter: formatChartCurrency },
       },
       tooltip: {
@@ -41,8 +44,8 @@ export default function SpendTrendChart({ data }) {
       },
       dataLabels: { enabled: false },
       colors: [GO_CHART_COLORS[0]], // orange
-    });
-  }, [data]);
+    }, theme);
+  }, [data, theme]);
 
   const series = useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -59,13 +62,13 @@ export default function SpendTrendChart({ data }) {
 
   if (!data || data.length === 0) {
     return (
-      <p className="py-10 text-center font-body text-sm" style={{ color: "var(--go-gray-2)" }}>
+      <p className="py-10 text-center font-body text-sm" style={{ color: "var(--go-text-secondary)" }}>
         Sin datos de tendencia en este período.
       </p>
     );
   }
 
   return (
-    <Chart options={options} series={series} type="area" height={280} width="100%" />
+    <Chart key={theme} options={options} series={series} type="area" height={280} width="100%" />
   );
 }

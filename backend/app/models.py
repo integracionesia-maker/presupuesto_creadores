@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import enum
 
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, Index, text,
+    Column, Integer, String, Float, Boolean, Date, DateTime, Text, ForeignKey, Index, text,
 )
 from sqlalchemy.orm import relationship
 
@@ -20,20 +20,71 @@ class UserRole(str, enum.Enum):
     CREADOR = "creador"
 
 
+class CyclePeriod(str, enum.Enum):
+    SEMANAL = "semanal"
+    MENSUAL = "mensual"
+
+
+class TicketStatus(str, enum.Enum):
+    PENDIENTE = "pendiente"
+    APROBADO = "aprobado"
+    RECHAZADO = "rechazado"
+
+
+class BrandPriority(str, enum.Enum):
+    ALTA = "alta"
+    MEDIA = "media"
+    BAJA = "baja"
+
+
 class Creator(Base):
     __tablename__ = "creators"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
-    initial_budget = Column(Float, nullable=False)
+    # Histórico acumulado — congelado desde la migración a ciclos (R7); ya no se
+    # escribe en ningún flujo nuevo, solo se conserva como snapshot informativo.
+    initial_budget = Column(Float, nullable=False, default=0.0)
     spent_budget = Column(Float, nullable=False, default=0.00)
     remaining_budget = Column(Float, nullable=False, default=0.00)
+    # Configuración vigente para el PRÓXIMO ciclo a materializar (get_or_create_cycle_for_date).
+    # Cambiarla nunca afecta ciclos ya creados (doc/mejoras-diseno-fase1.md §0.D).
+    cycle_budget_amount = Column(Float, nullable=True)
+    cycle_period = Column(String(20), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
 
     tickets = relationship("Ticket", back_populates="creator", lazy="selectin")
+    budget_cycles = relationship(
+        "BudgetCycle", back_populates="creator", cascade="all, delete-orphan"
+    )
+
+
+class BudgetCycle(Base):
+    """Un periodo de presupuesto (semanal o mensual) para un creador. Se crea
+    perezosamente (get_or_create_cycle_for_date) — nunca por cron. Es un snapshot
+    inmutable: su `amount`/fechas no cambian una vez creado, aunque el creador
+    reconfigure su ciclo/monto para ciclos futuros."""
+
+    __tablename__ = "budget_cycles"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    creator_id = Column(Integer, ForeignKey("creators.id", ondelete="CASCADE"), nullable=False)
+    period_type = Column(String(20), nullable=False)
+    amount = Column(Float, nullable=False)
+    spent = Column(Float, nullable=False, default=0.0)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+
+    creator = relationship("Creator", back_populates="budget_cycles")
+    tickets = relationship("Ticket", back_populates="budget_cycle")
+
+    __table_args__ = (
+        Index("ix_budget_cycles_creator_dates", "creator_id", "start_date", "end_date"),
+    )
 
 
 class Brand(Base):
@@ -41,6 +92,7 @@ class Brand(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), unique=True, nullable=False)
+    priority = Column(String(20), nullable=False, default=BrandPriority.MEDIA.value)
     is_active = Column(Boolean, nullable=False, default=True)
 
     tickets = relationship("Ticket", back_populates="brand", lazy="selectin")
@@ -52,7 +104,14 @@ class Ticket(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     creator_id = Column(Integer, ForeignKey("creators.id", ondelete="RESTRICT"), nullable=False)
     brand_id = Column(Integer, ForeignKey("brands.id", ondelete="RESTRICT"), nullable=False)
+    budget_cycle_id = Column(
+        Integer, ForeignKey("budget_cycles.id", ondelete="SET NULL"), nullable=True
+    )
     amount = Column(Float, nullable=False)
+    status = Column(String(20), nullable=False, default=TicketStatus.PENDIENTE.value)
+    rejection_reason = Column(Text, nullable=True)
+    reviewed_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
     file_name = Column(String(255), nullable=False)
     file_path = Column(String(512), nullable=False)
     mime_type = Column(String(100), nullable=False)
@@ -63,6 +122,8 @@ class Ticket(Base):
 
     creator = relationship("Creator", back_populates="tickets")
     brand = relationship("Brand", back_populates="tickets")
+    budget_cycle = relationship("BudgetCycle", back_populates="tickets", lazy="selectin")
+    reviewed_by = relationship("User", lazy="selectin")
 
 
 class User(Base):

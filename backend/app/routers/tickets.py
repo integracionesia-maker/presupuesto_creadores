@@ -1,4 +1,4 @@
-"""REST endpoints for tickets — includes transactional file-upload flow."""
+"""REST endpoints for tickets — carga con validación (R10) y ciclos de presupuesto (R7)."""
 
 from datetime import date
 from typing import List, Optional
@@ -14,38 +14,52 @@ from ..upload_manager import save_upload, delete_upload
 
 router = APIRouter(prefix="/api/tickets", tags=["tickets"])
 
+VALID_STATUSES = {s.value for s in models.TicketStatus}
+
+
+def _ticket_to_response(t: models.Ticket) -> schemas.TicketResponse:
+    cycle = t.budget_cycle
+    return schemas.TicketResponse(
+        id=t.id,
+        creator_id=t.creator_id,
+        brand_id=t.brand_id,
+        budget_cycle_id=t.budget_cycle_id,
+        amount=t.amount,
+        status=t.status,
+        rejection_reason=t.rejection_reason,
+        reviewed_by_user_id=t.reviewed_by_user_id,
+        reviewed_at=t.reviewed_at,
+        file_name=t.file_name,
+        file_path=t.file_path,
+        mime_type=t.mime_type,
+        upload_date=t.upload_date,
+        notes=t.notes,
+        creator_name=t.creator.name if t.creator else None,
+        brand_name=t.brand.name if t.brand else None,
+        brand_priority=t.brand.priority if t.brand else None,
+        cycle_amount=cycle.amount if cycle else None,
+        cycle_spent=cycle.spent if cycle else None,
+    )
+
 
 @router.get("/", response_model=List[schemas.TicketResponse])
 def list_tickets(
     creator_name: Optional[str] = None,
     brand_name: Optional[str] = None,
+    status: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user),
 ):
+    if status is not None and status not in VALID_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Estado inválido: '{status}'.")
+
     if current_user.role == "creador":
         # Se ignora cualquier filtro por nombre de creador: un creador solo ve lo suyo.
-        tickets = crud.get_tickets(db, creator_name=None, brand_name=brand_name)
+        tickets = crud.get_tickets(db, creator_name=None, brand_name=brand_name, status=status)
         tickets = [t for t in tickets if t.creator_id == current_user.creator_id]
     else:
-        tickets = crud.get_tickets(db, creator_name=creator_name, brand_name=brand_name)
-    result: List[schemas.TicketResponse] = []
-    for t in tickets:
-        result.append(
-            schemas.TicketResponse(
-                id=t.id,
-                creator_id=t.creator_id,
-                brand_id=t.brand_id,
-                amount=t.amount,
-                file_name=t.file_name,
-                file_path=t.file_path,
-                mime_type=t.mime_type,
-                upload_date=t.upload_date,
-                notes=t.notes,
-                creator_name=t.creator.name if t.creator else None,
-                brand_name=t.brand.name if t.brand else None,
-            )
-        )
-    return result
+        tickets = crud.get_tickets(db, creator_name=creator_name, brand_name=brand_name, status=status)
+    return [_ticket_to_response(t) for t in tickets]
 
 
 @router.get("/brand-spend", response_model=List[schemas.BrandSpendItem])
@@ -100,19 +114,18 @@ def create_ticket(
         if not brand.is_active:
             raise HTTPException(status_code=400, detail="La marca esta inactiva.")
 
-        if creator.remaining_budget < amount:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Fondos insuficientes. El creador '{creator.name}' tiene "
-                    f"${creator.remaining_budget:,.2f} restante, "
-                    f"pero el ticket requiere ${amount:,.2f}."
-                ),
-            )
+        # R10: tickets de creador nacen pendientes (no descuentan); admin/superadmin
+        # se auto-aprueban de inmediato (flujo actual). Ninguno de los dos valida
+        # fondos — los ciclos pueden quedar en negativo a propósito (ver R7 §0.B).
+        status = (
+            models.TicketStatus.PENDIENTE.value
+            if current_user.role == "creador"
+            else models.TicketStatus.APROBADO.value
+        )
 
         file_name, file_path_on_disk, mime_type = save_upload(file)
 
-        ticket = crud.create_ticket_transactional(
+        ticket = crud.create_ticket(
             db=db,
             creator=creator,
             brand=brand,
@@ -121,21 +134,19 @@ def create_ticket(
             file_path=file_path_on_disk,
             mime_type=mime_type,
             notes=notes,
+            status=status,
+            actor_user_id=current_user.id,
+        )
+        crud.log_audit(
+            db,
+            actor_user_id=current_user.id,
+            action="ticket.create",
+            target_type="ticket",
+            target_id=ticket.id,
+            details=f"status={status}",
         )
 
-        return schemas.TicketResponse(
-            id=ticket.id,
-            creator_id=ticket.creator_id,
-            brand_id=ticket.brand_id,
-            amount=ticket.amount,
-            file_name=ticket.file_name,
-            file_path=ticket.file_path,
-            mime_type=ticket.mime_type,
-            upload_date=ticket.upload_date,
-            notes=ticket.notes,
-            creator_name=creator.name,
-            brand_name=brand.name,
-        )
+        return _ticket_to_response(ticket)
 
     except HTTPException:
         db.rollback()
@@ -149,3 +160,51 @@ def create_ticket(
         raise HTTPException(status_code=500, detail=f"Error inesperado al crear el ticket: {exc}")
     finally:
         db.close()
+
+
+@router.post("/{ticket_id}/aprobar", response_model=schemas.TicketResponse)
+def aprobar_ticket(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin", "superadmin")),
+):
+    ticket = crud.get_ticket(db, ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket no encontrado.")
+    if ticket.status != models.TicketStatus.PENDIENTE.value:
+        raise HTTPException(status_code=400, detail="Solo se pueden aprobar tickets pendientes.")
+
+    ticket = crud.approve_ticket(db, ticket, actor_user_id=current_user.id)
+    crud.log_audit(
+        db,
+        actor_user_id=current_user.id,
+        action="ticket.approve",
+        target_type="ticket",
+        target_id=ticket.id,
+    )
+    return _ticket_to_response(ticket)
+
+
+@router.post("/{ticket_id}/rechazar", response_model=schemas.TicketResponse)
+def rechazar_ticket(
+    ticket_id: int,
+    data: schemas.TicketRejectRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin", "superadmin")),
+):
+    ticket = crud.get_ticket(db, ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket no encontrado.")
+    if ticket.status != models.TicketStatus.PENDIENTE.value:
+        raise HTTPException(status_code=400, detail="Solo se pueden rechazar tickets pendientes.")
+
+    ticket = crud.reject_ticket(db, ticket, reason=data.reason, actor_user_id=current_user.id)
+    crud.log_audit(
+        db,
+        actor_user_id=current_user.id,
+        action="ticket.reject",
+        target_type="ticket",
+        target_id=ticket.id,
+        details=data.reason,
+    )
+    return _ticket_to_response(ticket)
