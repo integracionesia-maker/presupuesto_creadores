@@ -39,6 +39,8 @@ def _ticket_to_response(t: models.Ticket) -> schemas.TicketResponse:
         brand_priority=t.brand.priority if t.brand else None,
         cycle_amount=cycle.amount if cycle else None,
         cycle_spent=cycle.spent if cycle else None,
+        is_deleted=t.is_deleted,
+        deleted_at=t.deleted_at,
     )
 
 
@@ -79,7 +81,7 @@ def download_file(
     current_user: models.User = Depends(get_current_user),
 ):
     ticket = crud.get_ticket(db, ticket_id)
-    if not ticket:
+    if not ticket or ticket.is_deleted:
         raise HTTPException(status_code=404, detail="Ticket no encontrado.")
     if current_user.role == "creador" and ticket.creator_id != current_user.creator_id:
         raise HTTPException(status_code=403, detail="No tienes permiso para esta acción.")
@@ -169,7 +171,7 @@ def aprobar_ticket(
     current_user: models.User = Depends(require_role("admin", "superadmin")),
 ):
     ticket = crud.get_ticket(db, ticket_id)
-    if not ticket:
+    if not ticket or ticket.is_deleted:
         raise HTTPException(status_code=404, detail="Ticket no encontrado.")
     if ticket.status != models.TicketStatus.PENDIENTE.value:
         raise HTTPException(status_code=400, detail="Solo se pueden aprobar tickets pendientes.")
@@ -193,7 +195,7 @@ def rechazar_ticket(
     current_user: models.User = Depends(require_role("admin", "superadmin")),
 ):
     ticket = crud.get_ticket(db, ticket_id)
-    if not ticket:
+    if not ticket or ticket.is_deleted:
         raise HTTPException(status_code=404, detail="Ticket no encontrado.")
     if ticket.status != models.TicketStatus.PENDIENTE.value:
         raise HTTPException(status_code=400, detail="Solo se pueden rechazar tickets pendientes.")
@@ -208,3 +210,46 @@ def rechazar_ticket(
         details=data.reason,
     )
     return _ticket_to_response(ticket)
+
+
+@router.post("/{ticket_id}/soft-delete", response_model=schemas.TicketResponse)
+def soft_delete_ticket(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin", "superadmin")),
+):
+    ticket = crud.get_ticket(db, ticket_id)
+    if not ticket or ticket.is_deleted:
+        raise HTTPException(status_code=404, detail="Ticket no encontrado.")
+
+    ticket = crud.soft_delete_ticket(db, ticket, actor_user_id=current_user.id)
+    crud.log_audit(
+        db,
+        actor_user_id=current_user.id,
+        action="ticket.soft-delete",
+        target_type="ticket",
+        target_id=ticket.id,
+    )
+    return _ticket_to_response(ticket)
+
+
+@router.delete("/{ticket_id}/permanent", response_model=schemas.MessageResponse)
+def hard_delete_ticket(
+    ticket_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin", "superadmin")),
+):
+    ticket = crud.get_ticket(db, ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket no encontrado.")
+
+    ticket_id_for_log = ticket.id
+    crud.hard_delete_ticket(db, ticket)
+    crud.log_audit(
+        db,
+        actor_user_id=current_user.id,
+        action="ticket.hard-delete",
+        target_type="ticket",
+        target_id=ticket_id_for_log,
+    )
+    return schemas.MessageResponse(message="Ticket eliminado permanentemente.")

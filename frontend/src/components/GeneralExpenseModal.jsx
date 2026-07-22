@@ -1,6 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import { uploadTicket } from "../api";
-import { useAuth } from "../context/AuthContext";
+import { useState, useRef, useCallback } from "react";
+import { createGeneralExpense } from "../api";
 
 const ALLOWED_EXTS = [".jpg", ".jpeg", ".png", ".pdf"];
 const ALLOWED_MIME = [
@@ -10,27 +9,9 @@ const ALLOWED_MIME = [
   "application/pdf",
 ];
 
-function formatCurrency(amount) {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    minimumFractionDigits: 2,
-  }).format(amount);
-}
-
-export default function UploadTicketModal({
-  creators,
-  brands,
-  onClose,
-  onSuccess,
-}) {
-  const { user } = useAuth();
-  const isCreador = user?.role === "creador";
-
-  const [creatorId, setCreatorId] = useState("");
-  const [brandId, setBrandId] = useState("");
+export default function GeneralExpenseModal({ onClose, onSuccess }) {
+  const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [notes, setNotes] = useState("");
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
 
@@ -39,22 +20,6 @@ export default function UploadTicketModal({
   const [successMsg, setSuccessMsg] = useState(null);
 
   const fileInputRef = useRef(null);
-
-  /* ── Derived ─────────────────────────────────────────────────────────── */
-
-  const activeCreators = creators.filter((c) => c.is_active);
-  const activeBrands = brands.filter((b) => b.is_active);
-
-  const selectedCreator = activeCreators.find(
-    (c) => c.id === Number(creatorId)
-  );
-
-  /* Un creador solo registra tickets a su propio nombre: preseleccionado y bloqueado. */
-  useEffect(() => {
-    if (isCreador && !creatorId && activeCreators.length > 0) {
-      setCreatorId(String(activeCreators[0].id));
-    }
-  }, [isCreador, creatorId, activeCreators]);
 
   /* ── File validation ─────────────────────────────────────────────────── */
 
@@ -114,12 +79,12 @@ export default function UploadTicketModal({
     setError(null);
     setSuccessMsg(null);
 
-    if (!creatorId) {
-      setError("Selecciona un creador.");
+    if (!description || description.trim().length < 1) {
+      setError("La descripción es obligatoria.");
       return;
     }
-    if (!brandId) {
-      setError("Selecciona una marca.");
+    if (description.length > 500) {
+      setError("La descripción no puede superar los 500 caracteres.");
       return;
     }
     if (!amount || Number(amount) <= 0) {
@@ -127,20 +92,18 @@ export default function UploadTicketModal({
       return;
     }
     if (!file) {
-      setError("Adjunta el archivo del ticket.");
+      setError("Adjunta el comprobante del gasto.");
       return;
     }
 
     setSubmitting(true);
     try {
-      await uploadTicket({
-        creatorId: Number(creatorId),
-        brandId: Number(brandId),
+      await createGeneralExpense({
         amount: Number(amount),
-        notes: notes || undefined,
+        description,
         file,
       });
-      setSuccessMsg("Ticket registrado exitosamente.");
+      setSuccessMsg("Gasto general registrado exitosamente.");
       setTimeout(() => {
         onSuccess();
       }, 800);
@@ -174,7 +137,7 @@ export default function UploadTicketModal({
             className="font-display text-base font-bold uppercase tracking-[0.06em]"
             style={{ color: "var(--go-text-primary)" }}
           >
-            Registrar Nuevo Ticket
+            Nuevo Gasto General
           </h2>
           <button
             onClick={onClose}
@@ -191,46 +154,26 @@ export default function UploadTicketModal({
 
         {/* ── Body ────────────────────────────────────────────────── */}
         <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
-          {/* Creator dropdown */}
+          {/* Description */}
           <div>
-            <label className="go-eyebrow mb-1.5 block">Creador</label>
-            <select
-              value={creatorId}
-              onChange={(e) => setCreatorId(e.target.value)}
-              className="go-select"
+            <label className="go-eyebrow mb-1.5 block">Descripción</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              maxLength={500}
+              placeholder="Describe el gasto general..."
+              className="go-input resize-none"
               required
-              disabled={isCreador}
-            >
-              {!isCreador && <option value="">Seleccionar creador...</option>}
-              {activeCreators.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} — Restante del ciclo: {formatCurrency(c.cycle_remaining ?? 0)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Brand dropdown */}
-          <div>
-            <label className="go-eyebrow mb-1.5 block">Marca</label>
-            <select
-              value={brandId}
-              onChange={(e) => setBrandId(e.target.value)}
-              className="go-select"
-              required
-            >
-              <option value="">Seleccionar marca...</option>
-              {activeBrands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+            />
+            <p className="mt-1 font-body text-xs" style={{ color: "var(--go-text-muted)" }}>
+              {description.length}/500 caracteres
+            </p>
           </div>
 
           {/* Amount */}
           <div>
-            <label className="go-eyebrow mb-1.5 block">Monto del Ticket</label>
+            <label className="go-eyebrow mb-1.5 block">Monto</label>
             <div className="relative">
               <span
                 className="absolute left-3.5 top-[10px] font-mono text-sm"
@@ -249,45 +192,6 @@ export default function UploadTicketModal({
                 required
               />
             </div>
-            {selectedCreator && amount > 0 && (
-              <p
-                className="mt-1.5 font-body text-xs"
-                style={{
-                  color:
-                    Number(amount) > (selectedCreator.cycle_remaining ?? 0)
-                      ? "var(--go-warning)"
-                      : "var(--go-text-secondary)",
-                }}
-              >
-                {Number(amount) > (selectedCreator.cycle_remaining ?? 0)
-                  ? `Atención: el monto excede el restante del ciclo (${formatCurrency(selectedCreator.cycle_remaining ?? 0)}). Se puede registrar igual.`
-                  : `Restante del ciclo después del ticket: ${formatCurrency(
-                      (selectedCreator.cycle_remaining ?? 0) - Number(amount)
-                    )}`}
-              </p>
-            )}
-            {isCreador && (
-              <p className="mt-1.5 font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
-                Tu ticket quedará <strong>pendiente de validación</strong> — no descuenta presupuesto hasta que un administrador lo apruebe.
-              </p>
-            )}
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="go-eyebrow mb-1.5 block">
-              Observaciones{" "}
-              <span className="font-normal normal-case tracking-normal" style={{ color: "var(--go-text-muted)" }}>
-                (opcional)
-              </span>
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Notas sobre este gasto..."
-              className="go-input resize-none"
-            />
           </div>
 
           {/* File drop zone */}
@@ -414,7 +318,7 @@ export default function UploadTicketModal({
                   Registrando...
                 </>
               ) : (
-                "Registrar Ticket"
+                "Registrar Gasto"
               )}
             </button>
           </div>

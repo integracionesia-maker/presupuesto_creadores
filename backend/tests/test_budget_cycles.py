@@ -149,3 +149,27 @@ def test_approve_can_push_cycle_negative(db, brand_a):
     cycle = approved.budget_cycle
     assert cycle.spent == 500
     assert cycle.amount - cycle.spent == -400  # negativo, permitido
+
+
+def test_soft_delete_reverts_cycle_spent(db, brand_a):
+    """R12: borrar (lógico) un ticket aprobado revierte su monto del ciclo."""
+    creator = make_creator(db, name="C11", cycle_budget_amount=1000, cycle_period="mensual")
+    approver = make_user(db, username="revisor3", password="ClaveValida123!", role="admin")
+    ticket = crud.create_ticket(
+        db=db,
+        creator=creator,
+        brand=brand_a,
+        amount=300,
+        file_name="f.pdf",
+        file_path=__file__,
+        mime_type="application/pdf",
+        notes=None,
+        status="aprobado",
+        actor_user_id=approver.id,
+    )
+    cycle = ticket.budget_cycle
+    assert cycle.spent == 300
+
+    crud.soft_delete_ticket(db, ticket, actor_user_id=approver.id)
+    db.refresh(cycle)
+    assert cycle.spent == 0

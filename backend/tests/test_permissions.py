@@ -19,9 +19,18 @@ NO_TOKEN_ENDPOINTS = [
     ("get", "/api/tickets/brand-spend"),
     ("get", "/api/tickets/file/1"),
     ("post", "/api/tickets/"),
+    ("post", "/api/tickets/1/soft-delete"),
+    ("delete", "/api/tickets/1/permanent"),
     ("get", "/api/dashboard/summary"),
     ("get", "/api/dashboard/monthly-spend"),
     ("get", "/api/dashboard/creator-usage"),
+    ("get", "/api/dashboard/general-expenses-monthly"),
+    ("get", "/api/general-expenses/"),
+    ("post", "/api/general-expenses/"),
+    ("get", "/api/general-expenses/export?months=2026-07"),
+    ("get", "/api/general-expenses/1/file"),
+    ("post", "/api/general-expenses/1/soft-delete"),
+    ("delete", "/api/general-expenses/1/permanent"),
     ("get", "/api/users/"),
     ("post", "/api/users/"),
     ("get", "/api/users/1"),
@@ -189,13 +198,66 @@ class TestTicketsPermissionsAndIDOR:
 
 class TestDashboardPermissions:
     @pytest.mark.parametrize(
-        "path", ["/api/dashboard/summary", "/api/dashboard/monthly-spend", "/api/dashboard/creator-usage"]
+        "path",
+        [
+            "/api/dashboard/summary",
+            "/api/dashboard/monthly-spend",
+            "/api/dashboard/creator-usage",
+            "/api/dashboard/general-expenses-monthly",
+        ],
     )
     def test_creador_forbidden(self, logged_in_creador, path):
         assert logged_in_creador.get(path).status_code == 403
 
     @pytest.mark.parametrize(
-        "path", ["/api/dashboard/summary", "/api/dashboard/monthly-spend", "/api/dashboard/creator-usage"]
+        "path",
+        [
+            "/api/dashboard/summary",
+            "/api/dashboard/monthly-spend",
+            "/api/dashboard/creator-usage",
+            "/api/dashboard/general-expenses-monthly",
+        ],
     )
     def test_admin_allowed(self, logged_in_admin, path):
         assert logged_in_admin.get(path).status_code == 200
+
+
+class TestTicketDeletePermissions:
+    def test_creador_cannot_soft_delete(self, logged_in_admin, logged_in_creador, creator_a, brand_a):
+        resp = logged_in_admin.post(
+            "/api/tickets/",
+            data={"creator_id": str(creator_a.id), "brand_id": str(brand_a.id), "amount": "50"},
+            files={"file": ("f.pdf", b"%PDF-1.4", "application/pdf")},
+        ).json()
+        assert logged_in_creador.post(f"/api/tickets/{resp['id']}/soft-delete").status_code == 403
+
+    def test_admin_can_soft_and_hard_delete(self, logged_in_admin, creator_a, brand_a):
+        resp = logged_in_admin.post(
+            "/api/tickets/",
+            data={"creator_id": str(creator_a.id), "brand_id": str(brand_a.id), "amount": "50"},
+            files={"file": ("f.pdf", b"%PDF-1.4", "application/pdf")},
+        ).json()
+        assert logged_in_admin.post(f"/api/tickets/{resp['id']}/soft-delete").status_code == 200
+        assert logged_in_admin.delete(f"/api/tickets/{resp['id']}/permanent").status_code == 200
+
+
+class TestGeneralExpensesPermissions:
+    def test_creador_cannot_create(self, logged_in_creador):
+        resp = logged_in_creador.post(
+            "/api/general-expenses/",
+            data={"amount": "100", "description": "x"},
+            files={"file": ("f.pdf", b"%PDF-1.4", "application/pdf")},
+        )
+        assert resp.status_code == 403
+
+    def test_creador_cannot_list(self, logged_in_creador):
+        assert logged_in_creador.get("/api/general-expenses/").status_code == 403
+
+    def test_admin_can_create_and_list(self, logged_in_admin):
+        create_resp = logged_in_admin.post(
+            "/api/general-expenses/",
+            data={"amount": "100", "description": "x"},
+            files={"file": ("f.pdf", b"%PDF-1.4", "application/pdf")},
+        )
+        assert create_resp.status_code == 201
+        assert logged_in_admin.get("/api/general-expenses/").status_code == 200

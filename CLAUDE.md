@@ -2,7 +2,7 @@
 
 > Conexiones pool: [[CLAUDE]] | [[context_proyectos]] | [[framework_operative_enforcement/CLAUDE]] | [[framework_operative_enforcement/PLAYBOOK]] | [[framework_operative_enforcement/FRAMEWORK]]
 > Recursos compartidos: [[IDENTIDAD DE MARCA/context_design]] (visual)
-> Archivos del proyecto: [[CLAUDE]] | [[context]] | [[status]] | [[BACKLOG]] | [[RISKS]] | [[MVP_BREAKDOWN]] | [[DESIGN_SYSTEM]] | [[avances_diarios]] | [[doc/auth-arquitectura]] | [[doc/auth-manual-usuario]] | [[doc/presupuestos-y-validacion]]
+> Archivos del proyecto: [[CLAUDE]] | [[context]] | [[status]] | [[BACKLOG]] | [[RISKS]] | [[MVP_BREAKDOWN]] | [[DESIGN_SYSTEM]] | [[avances_diarios]] | [[doc/auth-arquitectura]] | [[doc/auth-manual-usuario]] | [[doc/presupuestos-y-validacion]] | [[doc/gastos-generales-manual]] | [[doc/borrado-tickets]]
 
 ## Stack
 
@@ -22,6 +22,8 @@ Primer arranque (o para crear el superadmin si no existe): desde `backend/`, `py
 - La cuenta `superadmin` es **inmutable por API** (ningún endpoint cambia su rol ni la desactiva) — si se pierde su contraseña, usar `backend/reset_superadmin_password.py` (acceso al servidor, no a la app).
 - **Ciclos de presupuesto (semanal/mensual) nunca bloquean por fondos insuficientes** — aprobar un ticket puede dejar el ciclo en negativo a propósito (decisión explícita del usuario); no agregar validación de fondos en `crud.approve_ticket`/`create_ticket`. Un ticket se asigna a su ciclo por la fecha en que se **sube**, no la fecha en que se aprueba — ese campo (`budget_cycle_id`) se fija una sola vez al crear el ticket y nunca se recalcula. Detalle completo: `doc/presupuestos-y-validacion.md`.
 - **Estados de ticket**: `pendiente → aprobado | rechazado` (terminales). Solo los tickets subidos por un `creador` nacen `pendiente`; los de `admin`/`superadmin` se auto-aprueban. Un ticket `pendiente` nunca descuenta del ciclo; uno `rechazado` tampoco (nunca).
+- **Borrado de tickets (lógico y físico, R12)** — exclusivo de `admin`/`superadmin`. Un ticket con `is_deleted=True` deja de contar para TODO cálculo (listados, dashboard, brand-spend, cola de validación) — el filtro `is_deleted == False` debe estar en **todas** las queries de `tickets` sin excepción. Si el ticket borrado estaba `aprobado`, se revierte su monto del ciclo con `max(0, cycle.spent - amount)` (nunca negativo). El borrado lógico conserva registro y archivo; el físico borra ambos y es irreversible. Detalle completo: `doc/borrado-tickets.md`.
+- **Gastos generales (R12)** — tabla `general_expenses` independiente de `tickets`: sin `creator_id`/`brand_id`, sin `budget_cycle_id`, sin `status` de validación. Se crean y cuentan de inmediato, solo `admin`/`superadmin`. Mismo patrón de soft/hard delete que tickets pero sin reversión de ciclo (no aplica). Detalle completo: `doc/gastos-generales-manual.md`.
 - **Theming (`data-theme`)**: el selector en `index.css` es `[data-theme="light"]`, **sin** `:root` — a propósito, para que el reporte PDF (R8) pueda forzar tema claro en un contenedor propio (`data-theme="light"` local) sin tocar el tema real del usuario en `<html>`. No revertir a `:root[data-theme="light"]`, rompería esa plantilla off-screen.
 - `jspdf` y `html2canvas` son dependencias de frontend (no dev, corren en runtime) cargadas con `import()` dinámico solo al descargar el PDF — no agregar imports estáticos de estas dos, engordarían el bundle principal.
 - Rutas de `backend/app/main.py` y `database.py` son relativas al cwd (`./presupuesto.db`, `./uploads`) — siempre levantar uvicorn con cwd = `backend/`.
@@ -41,11 +43,15 @@ Diseño completo y matriz de permisos: `doc/auth-arquitectura.md`. Manual por ro
 
 Variables de entorno nuevas (ver `.env.example`): `JWT_SECRET_KEY` (obligatoria, generar con `python -c "import secrets; print(secrets.token_hex(32))"`), `JWT_ACCESS_TOKEN_EXPIRE_MINUTES`, `JWT_REFRESH_TOKEN_EXPIRE_DAYS`, `ENV` (`development`/`production`, controla `Secure` en cookies y si `/docs`/`/redoc` quedan expuestos), `SUPERADMIN_USERNAME`/`SUPERADMIN_EMAIL`/`SUPERADMIN_PASSWORD` (solo para `seed_auth.py`).
 
-Pruebas: `cd backend && python -m pytest` (119 pruebas, DB de prueba propia). E2E: dos archivos en `frontend/e2e/` (`auth.spec.js`, `presupuesto-flujo-completo.spec.js`) — correrlos por separado para no acercarse al rate limit de login (30/15min por IP); ver `doc/auth-manual-usuario.md` §Pruebas.
+Pruebas: `cd backend && python -m pytest` (167 pruebas, DB de prueba propia). E2E: archivos en `frontend/e2e/` (`auth.spec.js`, `presupuesto-flujo-completo.spec.js`, `gastos-generales.spec.js`) — correrlos por separado para no acercarse al rate limit de login (30/15min por IP); ver `doc/auth-manual-usuario.md` §Pruebas.
 
 ## Presupuestos y validación (R7/R9/R10)
 
 Ciclos de presupuesto, estados de ticket y prioridad de marcas: reglas de negocio completas con ejemplos en `doc/presupuestos-y-validacion.md`. Resumen de las reglas que más importan está en "Reglas criticas" arriba.
+
+## Gastos generales y borrado de tickets (R12)
+
+Gastos operativos independientes de creadores/marcas/ciclos, y borrado lógico/físico de tickets (con reversión de ciclo si el ticket estaba aprobado): reglas de negocio completas en `doc/gastos-generales-manual.md` y `doc/borrado-tickets.md`. Resumen en "Reglas criticas" arriba.
 
 ## Deploy
 

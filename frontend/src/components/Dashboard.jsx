@@ -5,6 +5,7 @@ import MonthlySpendChart from "./charts/MonthlySpendChart";
 import CreatorUsageChart from "./charts/CreatorUsageChart";
 import BrandSpendApexChart from "./charts/BrandSpendApexChart";
 import SpendTrendChart from "./charts/SpendTrendChart";
+import GeneralExpensesChart from "./charts/GeneralExpensesChart";
 import DashboardPdfTemplate from "./PdfReport/DashboardPdfTemplate";
 import { generateDashboardPdf } from "./PdfReport/generateDashboardPdf";
 import { useAuth } from "../context/AuthContext";
@@ -13,6 +14,7 @@ import {
   fetchMonthlySpend,
   fetchCreatorUsage,
   fetchBrandSpendBreakdown,
+  fetchGeneralExpensesMonthly,
 } from "../api";
 
 function formatCurrency(amount) {
@@ -37,6 +39,7 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
   const [monthly, setMonthly] = useState([]);
   const [creatorUsage, setCreatorUsage] = useState([]);
   const [brandSpend, setBrandSpend] = useState([]);
+  const [generalExpensesMonthly, setGeneralExpensesMonthly] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pdfState, setPdfState] = useState("idle"); // idle | rendering | generating
@@ -48,16 +51,18 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
     try {
       const start = fmtDateParam(dateRange.start);
       const end = fmtDateParam(dateRange.end);
-      const [s, m, c, b] = await Promise.all([
+      const [s, m, c, b, ge] = await Promise.all([
         fetchDashboardSummary(start, end),
         fetchMonthlySpend(start, end),
         fetchCreatorUsage(start, end),
         fetchBrandSpendBreakdown(start, end),
+        fetchGeneralExpensesMonthly(start, end),
       ]);
       setSummary(s);
       setMonthly(m);
       setCreatorUsage(c);
       setBrandSpend(b);
+      setGeneralExpensesMonthly(ge);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -78,6 +83,15 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
       ? (kpi.total_remaining / kpi.total_budget) * 100
       : 0;
 
+  const generalExpensesTotal = generalExpensesMonthly.reduce(
+    (acc, item) => acc + (item.total || 0),
+    0
+  );
+  const generalExpensesCount = generalExpensesMonthly.reduce(
+    (acc, item) => acc + (item.count || 0),
+    0
+  );
+
   const handleDownloadPdf = async () => {
     if (pdfState !== "idle") return;
     setError(null);
@@ -87,6 +101,7 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
       monthly,
       creatorUsage,
       brandSpend,
+      generalExpensesMonthly,
       dateRange,
       generatedAt: new Date(),
       generatedByName: user?.full_name,
@@ -196,7 +211,7 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
           </div>
 
           {/* ── KPI row 2: Period-specific ────────────────────────────── */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <KpiCard
               title="Gastado en el Período"
               value={summary ? formatCurrency(summary.total_spent) : "—"}
@@ -214,6 +229,12 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
               value={creatorUsage.filter((c) => c.spent > 0).length}
               subtitle="con gastos en el período"
               accent="sky"
+            />
+            <KpiCard
+              title="Gastos Generales"
+              value={formatCurrency(generalExpensesTotal)}
+              subtitle={`${generalExpensesCount} ${generalExpensesCount === 1 ? "gasto" : "gastos"} en el periodo`}
+              accent="orange"
             />
           </div>
 
@@ -272,6 +293,20 @@ export default function Dashboard({ kpi, dateRange, onDateRangeChange }) {
               <span className="go-eyebrow">MXN</span>
             </div>
             <SpendTrendChart data={monthly} />
+          </section>
+
+          {/* ── Row: General expenses by month ─────────────────────────── */}
+          <section className="go-card">
+            <div className="flex items-center justify-between mb-6">
+              <h2
+                className="font-display text-sm font-bold uppercase tracking-[0.08em]"
+                style={{ color: "var(--go-text-primary)" }}
+              >
+                Gastos Generales por Mes
+              </h2>
+              <span className="go-eyebrow">MXN</span>
+            </div>
+            <GeneralExpensesChart data={generalExpensesMonthly} />
           </section>
         </>
       )}

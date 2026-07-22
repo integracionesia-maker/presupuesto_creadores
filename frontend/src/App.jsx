@@ -7,6 +7,7 @@ import CreatorList from "./components/CreatorList";
 import TransactionTable from "./components/TransactionTable";
 import AdminView from "./components/AdminView";
 import ValidationQueue from "./components/ValidationQueue";
+import GeneralExpensesPage from "./pages/GeneralExpensesPage";
 import UploadTicketModal from "./components/UploadTicketModal";
 import ProtectedRoute from "./components/ProtectedRoute";
 import LoadingScreen from "./components/LoadingScreen";
@@ -197,7 +198,11 @@ function AppShell() {
                 loading || networkError ? (
                   <LoadingScreen isOffline={networkError} onRetry={loadData} />
                 ) : (
-                  <TransactionTable creators={creators} brands={brands} />
+                  <TransactionTable
+                    creators={creators}
+                    brands={brands}
+                    onChange={() => loadData({ silent: true })}
+                  />
                 )
               }
             />
@@ -222,6 +227,14 @@ function AppShell() {
               element={
                 <ProtectedRoute roles={ADMIN_ROLES}>
                   <ValidationQueue onChange={() => loadData({ silent: true })} />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/gastos-generales"
+              element={
+                <ProtectedRoute roles={ADMIN_ROLES}>
+                  <GeneralExpensesPage />
                 </ProtectedRoute>
               }
             />

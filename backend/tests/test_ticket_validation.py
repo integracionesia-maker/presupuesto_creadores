@@ -125,3 +125,12 @@ def test_approve_pushes_cycle_negative_without_blocking(logged_in_creador, logge
     data = creator_resp.json()
     assert data["cycle_spent"] == 50_000
     assert data["cycle_remaining"] < 0
+
+
+def test_soft_deleted_pending_ticket_not_in_validation_queue(logged_in_creador, logged_in_admin, creator_a, brand_a):
+    """R12: un ticket pendiente borrado (lógico) ya no debe aparecer en la cola de validación."""
+    ticket = _upload(logged_in_creador, creator_a.id, brand_a.id, amount=90).json()
+    logged_in_admin.post(f"/api/tickets/{ticket['id']}/soft-delete")
+
+    pendientes = logged_in_admin.get("/api/tickets/?status=pendiente").json()
+    assert all(t["id"] != ticket["id"] for t in pendientes)

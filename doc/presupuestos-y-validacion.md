@@ -1,6 +1,8 @@
 # Ciclos de presupuesto, validación de tickets y prioridad de marcas
 
 > Diseño final implementado (paquete R1-R11 de `doc/prompt-mejoras-integrales.md`). Reglas de negocio confirmadas explícitamente por el usuario en Fase 1 (`doc/mejoras-diseno-fase1.md` §0); este documento es la referencia definitiva de cómo se comportan en código, con ejemplos.
+>
+> **Paquete R12** (gastos generales y borrado de tickets, `docs/plan-gastos-generales-y-borrado-tickets.md`): ver §8 de este documento, y el detalle completo en `doc/gastos-generales-manual.md` y `doc/borrado-tickets.md`.
 
 ---
 
@@ -145,7 +147,21 @@ Generado 100% en el frontend (`jspdf` + `html2canvas`, cargadas con `import()` d
 
 ## 7. Pruebas que cubren estas reglas
 
-- `backend/tests/test_budget_cycles.py`: límites de semana/mes (incluye bisiestos), idempotencia, apertura de ciclo siguiente, relleno de huecos, que cambiar la config no toca el ciclo vigente, **asignación por fecha de subida cruzando un cambio de ciclo**, **aprobar puede dejar el ciclo en negativo**, listado de histórico.
-- `backend/tests/test_ticket_validation.py`: ticket de creador nace pendiente y no descuenta, ticket de admin se auto-aprueba y descuenta, aprobar/rechazar un pendiente, rechazo exige motivo, el creador ve el motivo, no se puede volver a aprobar un ticket ya aprobado, un creador no puede aprobar/rechazar (403), filtro por estado, aprobar empuja el ciclo a negativo sin bloquear.
+- `backend/tests/test_budget_cycles.py`: límites de semana/mes (incluye bisiestos), idempotencia, apertura de ciclo siguiente, relleno de huecos, que cambiar la config no toca el ciclo vigente, **asignación por fecha de subida cruzando un cambio de ciclo**, **aprobar puede dejar el ciclo en negativo**, listado de histórico, **borrado lógico revierte el descuento del ciclo** (R12).
+- `backend/tests/test_ticket_validation.py`: ticket de creador nace pendiente y no descuenta, ticket de admin se auto-aprueba y descuenta, aprobar/rechazar un pendiente, rechazo exige motivo, el creador ve el motivo, no se puede volver a aprobar un ticket ya aprobado, un creador no puede aprobar/rechazar (403), filtro por estado, aprobar empuja el ciclo a negativo sin bloquear, **un ticket pendiente borrado no aparece en la cola de validación** (R12).
 - `backend/tests/test_brand_priority.py`: default `media`, valores válidos/inválidos al crear y editar, orden alta/media/baja, el desglose de gastos por marca incluye prioridad y solo cuenta tickets aprobados.
+- `backend/tests/test_ticket_soft_delete.py` y `backend/tests/test_general_expenses.py`: reglas de borrado y de gastos generales (R12) — ver `doc/borrado-tickets.md` §"Pruebas que cubren estas reglas".
 - `frontend/e2e/presupuesto-flujo-completo.spec.js`: el flujo de punta a punta — creador sube pendiente → admin rechaza con motivo → creador ve el motivo y re-sube → admin aprueba y descuenta del ciclo vigente — más tema, popover, PDF y el recorrido en 375px.
+- `frontend/e2e/gastos-generales.spec.js`: flujo de gastos generales y borrado de tickets desde la UI (R12).
+
+## 8. Gastos generales (R12) — independientes de ciclos de creadores
+
+Los **Gastos Generales** son gastos operativos que no están ligados a ningún `Creator` ni `Brand` (ej. suscripciones de software, servicios). Viven en su propia tabla, `general_expenses` (`backend/app/models.py`), completamente separada de `tickets`:
+
+- **Sin ciclo de presupuesto**: no hay `budget_cycle_id`, no hay monto asignado contra el cual medirse, no hay concepto de "restante" ni de negativo.
+- **Sin estados de validación**: no tienen `status` — se crean y cuentan de inmediato. No hay `pendiente`/`aprobado`/`rechazado` para un gasto general.
+- **Solo `admin`/`superadmin`** pueden crear, listar, exportar o eliminar gastos generales — un `creador` recibe `403` en todo `/api/general-expenses/*` y no ve la sección en la barra lateral.
+- **Nunca afectan** los cálculos de presupuesto de creadores (KPIs, ciclos, dashboard de creadores) — son una dimensión de reporte totalmente aparte, con su propia gráfica mensual (`GET /api/dashboard/general-expenses-monthly`) y su propia exportación a PDF.
+- Comparten el mismo mecanismo de borrado lógico/físico que los tickets (ver `doc/borrado-tickets.md`), pero sin la parte de reversión de ciclo (no aplica, no tienen ciclo).
+
+Detalle completo de la feature (flujos de UI, formularios, exportación): `doc/gastos-generales-manual.md`.

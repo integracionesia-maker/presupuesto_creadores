@@ -1,9 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
-import { fetchTickets } from "../api";
+import { fetchTickets, softDeleteTicket, hardDeleteTicket } from "../api";
 import { PRIORITY_BADGE_CLASS, PRIORITY_LABELS } from "../utils/priority";
 import MediaViewerModal from "./MediaViewerModal";
+import DeleteConfirmModal from "./DeleteConfirmModal";
 import { SortableHeaderCell } from "./SortableHeader";
 import { useSortable } from "../hooks/useSortable";
+import { useAuth } from "../context/AuthContext";
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
@@ -42,7 +44,10 @@ function formatDate(iso) {
   });
 }
 
-export default function TransactionTable({ creators, brands }) {
+export default function TransactionTable({ creators, brands, onChange }) {
+  const { user } = useAuth();
+  const canDelete = user?.role === "admin" || user?.role === "superadmin";
+
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -53,6 +58,8 @@ export default function TransactionTable({ creators, brands }) {
   const [filterPriority, setFilterPriority] = useState("");
 
   const [viewerTicket, setViewerTicket] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -106,7 +113,7 @@ export default function TransactionTable({ creators, brands }) {
     return () => {
       cancelled = true;
     };
-  }, [filterCreator, filterBrand, filterStatus]);
+  }, [filterCreator, filterBrand, filterStatus, reloadToken]);
 
   return (
     <div className="space-y-6">
@@ -277,6 +284,7 @@ export default function TransactionTable({ creators, brands }) {
                 ))}
                 <th className="text-center">Estado</th>
                 <th className="text-center">Comprobante</th>
+                {canDelete && <th className="text-center">Eliminar</th>}
               </tr>
             </thead>
             <tbody>
@@ -337,6 +345,13 @@ export default function TransactionTable({ creators, brands }) {
                       Ver
                     </button>
                   </td>
+                  {canDelete && (
+                    <td className="text-center">
+                      <button onClick={() => setDeleteTarget(t)} className="btn-go-ghost text-xs px-3 py-1.5">
+                        Eliminar
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -407,6 +422,23 @@ export default function TransactionTable({ creators, brands }) {
       )}
 
       {viewerTicket && <MediaViewerModal ticket={viewerTicket} onClose={() => setViewerTicket(null)} />}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          itemLabel={`el ticket de ${deleteTarget.creator_name || `ID ${deleteTarget.creator_id}`} por ${formatCurrency(deleteTarget.amount)}`}
+          onClose={() => setDeleteTarget(null)}
+          onSoftDelete={async () => {
+            await softDeleteTicket(deleteTarget.id);
+            setReloadToken((n) => n + 1);
+            if (onChange) onChange();
+          }}
+          onHardDelete={async () => {
+            await hardDeleteTicket(deleteTarget.id);
+            setReloadToken((n) => n + 1);
+            if (onChange) onChange();
+          }}
+        />
+      )}
     </div>
   );
 }

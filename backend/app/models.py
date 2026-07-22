@@ -120,10 +120,42 @@ class Ticket(Base):
     )
     notes = Column(Text, nullable=True)
 
+    # Soft delete (R12): un ticket borrado deja de contar para todo cálculo pero
+    # el registro y el archivo se conservan (auditoría). Ver doc/borrado-tickets.md.
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
     creator = relationship("Creator", back_populates="tickets")
     brand = relationship("Brand", back_populates="tickets")
     budget_cycle = relationship("BudgetCycle", back_populates="tickets", lazy="selectin")
-    reviewed_by = relationship("User", lazy="selectin")
+    reviewed_by = relationship("User", foreign_keys=[reviewed_by_user_id], lazy="selectin")
+    deleted_by = relationship("User", foreign_keys=[deleted_by_user_id], lazy="selectin")
+
+
+class GeneralExpense(Base):
+    """Gasto operativo NO vinculado a un creador/marca (apps, servicios, etc.).
+    Tabla independiente de `tickets` a propósito: no tiene ciclo de presupuesto
+    ni estado de validación — se crea y cuenta de inmediato (solo admin/superadmin,
+    ver doc/gastos-generales-manual.md)."""
+
+    __tablename__ = "general_expenses"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    amount = Column(Float, nullable=False)
+    description = Column(Text, nullable=False)
+    file_name = Column(String(255), nullable=False)
+    file_path = Column(String(512), nullable=False)
+    mime_type = Column(String(100), nullable=False)
+    upload_date = Column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    deleted_at = Column(DateTime, nullable=True)
+    deleted_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    created_by = relationship("User", foreign_keys=[created_by_user_id], lazy="selectin")
+    deleted_by = relationship("User", foreign_keys=[deleted_by_user_id], lazy="selectin")
 
 
 class User(Base):

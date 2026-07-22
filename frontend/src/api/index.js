@@ -228,6 +228,61 @@ export function ticketFileUrl(ticketId) {
   return `${BASE}/tickets/file/${ticketId}`;
 }
 
+export function softDeleteTicket(id) {
+  return request(`/tickets/${id}/soft-delete`, { method: "POST" });
+}
+
+export function hardDeleteTicket(id) {
+  return request(`/tickets/${id}/permanent`, { method: "DELETE" });
+}
+
+/* ── Gastos Generales ────────────────────────────────────────────────────── */
+
+export function fetchGeneralExpenses({ startDate, endDate } = {}) {
+  const params = new URLSearchParams();
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+  const qs = params.toString();
+  return request(`/general-expenses/${qs ? `?${qs}` : ""}`);
+}
+
+export async function createGeneralExpense({ amount, description, file }) {
+  const formData = new FormData();
+  formData.append("amount", amount);
+  formData.append("description", description);
+  formData.append("file", file);
+
+  const res = await fetchWithAuthRetry("/general-expenses/", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `Error ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export function softDeleteGeneralExpense(id) {
+  return request(`/general-expenses/${id}/soft-delete`, { method: "POST" });
+}
+
+export function hardDeleteGeneralExpense(id) {
+  return request(`/general-expenses/${id}/permanent`, { method: "DELETE" });
+}
+
+export function generalExpenseFileUrl(id) {
+  return `${BASE}/general-expenses/${id}/file`;
+}
+
+export function fetchGeneralExpensesExport(months) {
+  const params = new URLSearchParams();
+  params.set("months", months.join(","));
+  return request(`/general-expenses/export?${params.toString()}`);
+}
+
 /* ── Dashboard ─────────────────────────────────────────────────────────────── */
 
 export function fetchDashboardSummary(startDate, endDate) {
@@ -252,4 +307,12 @@ export function fetchCreatorUsage(startDate, endDate) {
   if (endDate) params.set("end_date", endDate);
   const qs = params.toString();
   return request(`/dashboard/creator-usage${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchGeneralExpensesMonthly(startDate, endDate) {
+  const params = new URLSearchParams();
+  if (startDate) params.set("start_date", startDate);
+  if (endDate) params.set("end_date", endDate);
+  const qs = params.toString();
+  return request(`/dashboard/general-expenses-monthly${qs ? `?${qs}` : ""}`);
 }

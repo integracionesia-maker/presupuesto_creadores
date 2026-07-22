@@ -1,7 +1,7 @@
 """Pydantic schemas for request/response validation."""
 
 from datetime import date, datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -102,6 +102,8 @@ class TicketResponse(BaseModel):
     brand_priority: Optional[str] = None
     cycle_amount: Optional[float] = None
     cycle_spent: Optional[float] = None
+    is_deleted: bool = False
+    deleted_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -118,6 +120,41 @@ class BrandSpendItem(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+# ── Gastos generales (R12) ──────────────────────────────────────────────────
+
+
+class GeneralExpenseCreate(BaseModel):
+    amount: float = Field(..., gt=0)
+    description: str = Field(..., min_length=1, max_length=500)
+
+
+class GeneralExpenseResponse(BaseModel):
+    id: int
+    amount: float
+    description: str
+    file_name: str
+    file_path: str
+    mime_type: str
+    upload_date: datetime
+    created_by_user_id: Optional[int] = None
+    is_deleted: bool
+    deleted_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class GeneralExpenseMonthlyItem(BaseModel):
+    month: str  # "2026-07"
+    total: float
+    count: int
+
+
+class GeneralExpensesExportResponse(BaseModel):
+    months: List[str]
+    items: List[GeneralExpenseResponse]
+    total: float
 
 
 # ── Dashboard ──────────────────────────────────────────────────────────────────

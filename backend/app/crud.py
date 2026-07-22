@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, extract, case, and_
 
 from . import models, schemas
+from .upload_manager import delete_upload
 
 
 def _priority_rank(column):
@@ -236,7 +237,7 @@ def get_tickets(
     brand_name: Optional[str] = None,
     status: Optional[str] = None,
 ) -> List[models.Ticket]:
-    q = db.query(models.Ticket)
+    q = db.query(models.Ticket).filter(models.Ticket.is_deleted == False)
     if creator_name:
         q = q.join(models.Creator).filter(models.Creator.name.ilike(f"%{creator_name}%"))
     if brand_name:
@@ -321,6 +322,36 @@ def reject_ticket(
     return ticket
 
 
+def _revert_cycle_if_approved(ticket: models.Ticket) -> None:
+    """Si el ticket estaba aprobado, revierte su monto del ciclo asignado sin
+    dejarlo nunca negativo (R12). Pendiente/rechazado nunca descontaron: no-op."""
+    if ticket.status == models.TicketStatus.APROBADO.value and ticket.budget_cycle is not None:
+        cycle = ticket.budget_cycle
+        cycle.spent = max(0.0, cycle.spent - ticket.amount)
+
+
+def soft_delete_ticket(db: Session, ticket: models.Ticket, actor_user_id: int) -> models.Ticket:
+    """Marca un ticket como eliminado lógicamente. No borra el archivo del disco."""
+    _revert_cycle_if_approved(ticket)
+    ticket.is_deleted = True
+    ticket.deleted_at = datetime.now(timezone.utc)
+    ticket.deleted_by_user_id = actor_user_id
+    db.commit()
+    db.refresh(ticket)
+    return ticket
+
+
+def hard_delete_ticket(db: Session, ticket: models.Ticket) -> None:
+    """Borra el registro de la BD y el archivo del disco. Si el ticket ya
+    estaba soft-deleted, el ciclo ya se revirtió antes — no revertir de nuevo."""
+    if not ticket.is_deleted:
+        _revert_cycle_if_approved(ticket)
+    file_path = ticket.file_path
+    db.delete(ticket)
+    db.commit()
+    delete_upload(file_path)
+
+
 def get_brand_spend_breakdown(
     db: Session,
     start_date: Optional[date] = None,
@@ -331,11 +362,12 @@ def get_brand_spend_breakdown(
     join_conditions = [
         models.Brand.id == models.Ticket.brand_id,
         models.Ticket.status == models.TicketStatus.APROBADO.value,
+        models.Ticket.is_deleted == False,
     ]
     if start_date:
         join_conditions.append(models.Ticket.upload_date >= start_date)
     if end_date:
-        join_conditions.append(models.Ticket.upload_date <= end_date)
+        join_conditions.append(models.Ticket.upload_date < end_date + timedelta(days=1))
 
     q = db.query(
         models.Brand.name.label("brand_name"),
@@ -364,11 +396,14 @@ def get_monthly_spend(
         func.strftime("%Y-%m", models.Ticket.upload_date).label("month"),
         func.coalesce(func.sum(models.Ticket.amount), 0.0).label("total"),
         func.count(models.Ticket.id).label("count"),
-    ).filter(models.Ticket.status == models.TicketStatus.APROBADO.value)
+    ).filter(
+        models.Ticket.status == models.TicketStatus.APROBADO.value,
+        models.Ticket.is_deleted == False,
+    )
     if start_date:
         q = q.filter(models.Ticket.upload_date >= start_date)
     if end_date:
-        q = q.filter(models.Ticket.upload_date <= end_date)
+        q = q.filter(models.Ticket.upload_date < end_date + timedelta(days=1))
     rows = (
         q.group_by("month")
         .order_by("month")
@@ -388,11 +423,14 @@ def get_creator_usage(
     ticket_spent = db.query(
         models.Ticket.creator_id,
         func.coalesce(func.sum(models.Ticket.amount), 0.0).label("spent"),
-    ).filter(models.Ticket.status == models.TicketStatus.APROBADO.value)
+    ).filter(
+        models.Ticket.status == models.TicketStatus.APROBADO.value,
+        models.Ticket.is_deleted == False,
+    )
     if start_date:
         ticket_spent = ticket_spent.filter(models.Ticket.upload_date >= start_date)
     if end_date:
-        ticket_spent = ticket_spent.filter(models.Ticket.upload_date <= end_date)
+        ticket_spent = ticket_spent.filter(models.Ticket.upload_date < end_date + timedelta(days=1))
     ticket_spent = ticket_spent.group_by(models.Ticket.creator_id).subquery()
 
     rows = (
@@ -425,23 +463,29 @@ def get_dashboard_summary(
     q = db.query(
         func.coalesce(func.sum(models.Ticket.amount), 0.0),
         func.count(models.Ticket.id),
-    ).filter(models.Ticket.status == models.TicketStatus.APROBADO.value)
+    ).filter(
+        models.Ticket.status == models.TicketStatus.APROBADO.value,
+        models.Ticket.is_deleted == False,
+    )
     if start_date:
         q = q.filter(models.Ticket.upload_date >= start_date)
     if end_date:
-        q = q.filter(models.Ticket.upload_date <= end_date)
+        q = q.filter(models.Ticket.upload_date < end_date + timedelta(days=1))
     total_spent, ticket_count = q.first()
 
     active_brands = (
         db.query(func.count(func.distinct(models.Brand.id)))
         .filter(models.Brand.is_active == True)
         .join(models.Ticket, models.Brand.id == models.Ticket.brand_id)
-        .filter(models.Ticket.status == models.TicketStatus.APROBADO.value)
+        .filter(
+            models.Ticket.status == models.TicketStatus.APROBADO.value,
+            models.Ticket.is_deleted == False,
+        )
     )
     if start_date:
         active_brands = active_brands.filter(models.Ticket.upload_date >= start_date)
     if end_date:
-        active_brands = active_brands.filter(models.Ticket.upload_date <= end_date)
+        active_brands = active_brands.filter(models.Ticket.upload_date < end_date + timedelta(days=1))
     active_brands = active_brands.scalar() or 0
 
     avg_ticket = float(total_spent) / ticket_count if ticket_count > 0 else 0.0
@@ -452,6 +496,98 @@ def get_dashboard_summary(
         avg_ticket=round(avg_ticket, 2),
         active_brands=active_brands,
     )
+
+
+# ── Gastos generales (R12) ──────────────────────────────────────────────────
+# Independientes de creadores/marcas/ciclos: no pasan por validación, se crean
+# y cuentan de inmediato. Ver doc/gastos-generales-manual.md.
+
+def create_general_expense(
+    db: Session,
+    *,
+    amount: float,
+    description: str,
+    file_name: str,
+    file_path: str,
+    mime_type: str,
+    actor_user_id: int,
+) -> models.GeneralExpense:
+    expense = models.GeneralExpense(
+        amount=amount,
+        description=description,
+        file_name=file_name,
+        file_path=file_path,
+        mime_type=mime_type,
+        created_by_user_id=actor_user_id,
+    )
+    db.add(expense)
+    db.commit()
+    db.refresh(expense)
+    return expense
+
+
+def get_general_expenses(
+    db: Session, start_date: Optional[date] = None, end_date: Optional[date] = None
+) -> List[models.GeneralExpense]:
+    q = db.query(models.GeneralExpense).filter(models.GeneralExpense.is_deleted == False)
+    if start_date:
+        q = q.filter(models.GeneralExpense.upload_date >= start_date)
+    if end_date:
+        q = q.filter(models.GeneralExpense.upload_date < end_date + timedelta(days=1))
+    return q.order_by(models.GeneralExpense.upload_date.desc()).all()
+
+
+def get_general_expense(db: Session, expense_id: int) -> Optional[models.GeneralExpense]:
+    return db.query(models.GeneralExpense).filter(models.GeneralExpense.id == expense_id).first()
+
+
+def soft_delete_general_expense(
+    db: Session, expense: models.GeneralExpense, actor_user_id: int
+) -> models.GeneralExpense:
+    expense.is_deleted = True
+    expense.deleted_at = datetime.now(timezone.utc)
+    expense.deleted_by_user_id = actor_user_id
+    db.commit()
+    db.refresh(expense)
+    return expense
+
+
+def hard_delete_general_expense(db: Session, expense: models.GeneralExpense) -> None:
+    file_path = expense.file_path
+    db.delete(expense)
+    db.commit()
+    delete_upload(file_path)
+
+
+def get_general_expenses_monthly(
+    db: Session, start_date: Optional[date] = None, end_date: Optional[date] = None
+) -> List[schemas.GeneralExpenseMonthlyItem]:
+    q = db.query(
+        func.strftime("%Y-%m", models.GeneralExpense.upload_date).label("month"),
+        func.coalesce(func.sum(models.GeneralExpense.amount), 0.0).label("total"),
+        func.count(models.GeneralExpense.id).label("count"),
+    ).filter(models.GeneralExpense.is_deleted == False)
+    if start_date:
+        q = q.filter(models.GeneralExpense.upload_date >= start_date)
+    if end_date:
+        q = q.filter(models.GeneralExpense.upload_date < end_date + timedelta(days=1))
+    rows = q.group_by("month").order_by("month").all()
+    return [
+        schemas.GeneralExpenseMonthlyItem(month=r.month, total=float(r.total), count=r.count)
+        for r in rows
+    ]
+
+
+def get_general_expenses_for_export(db: Session, months: List[str]) -> List[models.GeneralExpense]:
+    """`months`: lista de 'YYYY-MM'. Sin meses, no retorna nada (el export
+    siempre exige una selección explícita)."""
+    if not months:
+        return []
+    q = db.query(models.GeneralExpense).filter(
+        models.GeneralExpense.is_deleted == False,
+        func.strftime("%Y-%m", models.GeneralExpense.upload_date).in_(months),
+    )
+    return q.order_by(models.GeneralExpense.upload_date.desc()).all()
 
 
 # ── Usuarios ─────────────────────────────────────────────────────────────────

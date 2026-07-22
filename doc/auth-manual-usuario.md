@@ -1,6 +1,6 @@
 # Manual de usuario — Autenticación, roles, presupuestos y validación
 
-> Incluye los flujos del paquete R1-R11 (temas, header/popover, ciclos de presupuesto, validación de tickets, prioridad de marcas, visor de comprobantes, PDF, responsividad). Reglas de negocio detalladas en `doc/presupuestos-y-validacion.md`.
+> Incluye los flujos del paquete R1-R11 (temas, header/popover, ciclos de presupuesto, validación de tickets, prioridad de marcas, visor de comprobantes, PDF, responsividad) y del paquete R12 (gastos generales, borrado lógico/físico de tickets). Reglas de negocio detalladas en `doc/presupuestos-y-validacion.md`, `doc/gastos-generales-manual.md` y `doc/borrado-tickets.md`.
 
 ## Iniciar sesión
 
@@ -19,7 +19,7 @@ Ve a **Mi Perfil** (ícono en la barra lateral) → sección "Cambiar contraseñ
 | Rol | Ves en la barra lateral | Puedes hacer |
 |---|---|---|
 | **Superadministrador** | Todo, incluida "Usuarios" | Todo lo del Administrador, **más** gestionar usuarios (crear/editar/resetear contraseña/activar-desactivar) |
-| **Administrador** | Inicio, Dashboard, Creadores, Transacciones, Validación, Administración (Creadores/Marcas) | Gestionar creadores y marcas, asignar presupuestos por ciclo, validar tickets de cualquier creador, descargar el PDF del dashboard. **No** gestiona usuarios (ver más abajo) |
+| **Administrador** | Inicio, Dashboard, Creadores, Transacciones, Validación, Gastos Generales, Administración (Creadores/Marcas) | Gestionar creadores y marcas, asignar presupuestos por ciclo, validar tickets de cualquier creador, descargar el PDF del dashboard, registrar/eliminar gastos generales, eliminar tickets (lógico o permanente). **No** gestiona usuarios (ver más abajo) |
 | **Creador** | Inicio, Transacciones, Mi Perfil | Ver y subir **solo tus propios** tickets (nacen pendientes hasta que un admin los valide); ver tu ciclo de presupuesto en Mi Perfil |
 
 Si entras a una URL que tu rol no puede ver, te muestra una página de "Acceso no autorizado" (no un error).
@@ -69,6 +69,25 @@ Cada marca tiene una prioridad — **Alta**, **Media** (default) o **Baja** — 
 
 Botón "Descargar PDF" en el Dashboard (solo admin/superadmin): genera un PDF con los KPIs, las gráficas y las tablas de desglose (por marca y por creador) tal como se ven en pantalla, con branding de Grupo Ortiz, para el período que tengas seleccionado en el filtro de fechas (incluye los atajos "Este mes", "Mes pasado", etc., o un rango personalizado).
 
+## Para Admin/Superadmin: Gastos Generales
+
+Sección **Gastos Generales** (barra lateral, entre Validación y Administración): gastos operativos que **no** están ligados a ningún creador ni marca (suscripciones, servicios, herramientas internas). No tienen ciclo de presupuesto ni pasan por validación — se registran y cuentan de inmediato.
+
+- **Nuevo Gasto General**: descripción, monto y comprobante (mismas reglas de archivo que un ticket: JPG/PNG/PDF, máx. 10 MB).
+- **Exportar**: elige uno o más de los últimos 12 meses y genera un PDF propio (independiente del PDF del Dashboard) con el detalle y el total.
+- **Eliminar**: igual mecanismo de dos niveles que los tickets — ver la siguiente sección.
+
+El Dashboard incluye una gráfica y un KPI de Gastos Generales para el período filtrado, y el PDF del Dashboard también los incluye. Detalle completo: `doc/gastos-generales-manual.md`.
+
+## Para Admin/Superadmin: eliminar tickets
+
+Cualquier ticket (en Transacciones o en Validación) tiene un botón **"Eliminar"**, con dos niveles:
+
+1. **Eliminar** (borrado lógico): el ticket deja de contar en listados, Dashboard y reportes, pero el registro y el comprobante se conservan — es reversible en el sentido de que queda auditado, aunque no hay un botón de "restaurar" en la UI todavía. Si el ticket estaba **aprobado**, su monto se devuelve al ciclo de presupuesto del creador.
+2. **Eliminar permanentemente**: un segundo paso con advertencia en rojo, ⚠️ **irreversible** — borra el registro y el archivo para siempre. Úsalo solo cuando estés seguro.
+
+Un creador nunca ve estos botones (ni en su propia vista de Transacciones). Detalle completo, incluida la tabla de impacto por estado del ticket: `doc/borrado-tickets.md`.
+
 ## Para Creadores: tu presupuesto y tickets
 
 - **Mi Perfil** muestra tu ciclo de presupuesto vigente: periodicidad, fechas del ciclo actual, monto, gastado y restante.
@@ -106,10 +125,11 @@ JWT_SECRET_KEY=e2e-test-secret-0123456789abcdef ENV=development DATABASE_URL=sql
 cd frontend
 VITE_BACKEND_PORT=8793 npx vite --host 127.0.0.1 --port 5175
 
-# Terminal 3 — la suite (los dos archivos por separado, ver nota de rate-limit abajo)
+# Terminal 3 — la suite (los archivos por separado, ver nota de rate-limit abajo)
 cd frontend
 E2E_SUPERADMIN_PASSWORD="SuperClaveE2E123!" E2E_BASE_URL="http://127.0.0.1:5175" npx playwright test e2e/auth.spec.js
 E2E_SUPERADMIN_PASSWORD="SuperClaveE2E123!" E2E_BASE_URL="http://127.0.0.1:5175" npx playwright test e2e/presupuesto-flujo-completo.spec.js
+E2E_SUPERADMIN_PASSWORD="SuperClaveE2E123!" E2E_BASE_URL="http://127.0.0.1:5175" npx playwright test e2e/gastos-generales.spec.js
 ```
 Borra `backend/test_e2e.db` antes de repetir el flujo completo desde cero (el superadmin es idempotente, pero los usuarios/creadores que crea la prueba no lo son entre corridas con la misma base).
 

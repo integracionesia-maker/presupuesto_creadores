@@ -2,6 +2,7 @@ import MonthlySpendChart from "../charts/MonthlySpendChart";
 import CreatorUsageChart from "../charts/CreatorUsageChart";
 import BrandSpendApexChart from "../charts/BrandSpendApexChart";
 import SpendTrendChart from "../charts/SpendTrendChart";
+import GeneralExpensesChart from "../charts/GeneralExpensesChart";
 import KpiCard from "../KpiCard";
 import { PRIORITY_LABELS, sortByPriority } from "../../utils/priority";
 import isotipoNaranja from "../../assets/logos/isotipo-go-naranja.png";
@@ -51,12 +52,15 @@ export default function DashboardPdfTemplate({
   dateRange,
   generatedAt,
   generatedByName,
+  generalExpensesMonthly = [],
 }) {
   const spentPct = kpi && kpi.total_budget > 0 ? (kpi.total_spent / kpi.total_budget) * 100 : 0;
   const remainingPct = kpi && kpi.total_budget > 0 ? (kpi.total_remaining / kpi.total_budget) * 100 : 0;
   const activeCreatorsInPeriod = creatorUsage.filter((c) => c.spent > 0).length;
   const brandRows = sortByPriority(brandSpend, (b) => b.priority).filter((b) => b.total_spent > 0);
   const creatorRows = [...creatorUsage].sort((a, b) => b.spent - a.spent);
+  const generalExpensesTotal = generalExpensesMonthly.reduce((sum, m) => sum + (m.total || 0), 0);
+  const generalExpensesCount = generalExpensesMonthly.reduce((sum, m) => sum + (m.count || 0), 0);
 
   const periodLabel =
     dateRange.start && dateRange.end
@@ -203,6 +207,43 @@ export default function DashboardPdfTemplate({
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      {/* ── Sección 7: gastos generales por mes ──────────────────────────── */}
+      <div className="pdf-section" style={SECTION_STYLE}>
+        <h2 style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#262626", marginBottom: "12px" }}>
+          Gastos Generales por Mes
+        </h2>
+        {generalExpensesMonthly.length === 0 ? (
+          <p style={{ fontSize: "12px", color: "#535353" }}>Sin gastos generales en el periodo.</p>
+        ) : (
+          <>
+            <GeneralExpensesChart data={generalExpensesMonthly} forceTheme="light" />
+            <table className="go-table">
+              <thead>
+                <tr>
+                  <th>Mes</th>
+                  <th style={{ textAlign: "right" }}>Total</th>
+                  <th style={{ textAlign: "right" }}>Gastos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {generalExpensesMonthly.map((m) => (
+                  <tr key={m.month}>
+                    <td>{m.month}</td>
+                    <td className="num" style={{ textAlign: "right" }}>{formatCurrency(m.total)}</td>
+                    <td className="num" style={{ textAlign: "right" }}>{m.count}</td>
+                  </tr>
+                ))}
+                <tr style={{ fontWeight: 700 }}>
+                  <td>Total</td>
+                  <td className="num" style={{ textAlign: "right" }}>{formatCurrency(generalExpensesTotal)}</td>
+                  <td className="num" style={{ textAlign: "right" }}>{generalExpensesCount}</td>
+                </tr>
+              </tbody>
+            </table>
+          </>
         )}
       </div>
     </div>

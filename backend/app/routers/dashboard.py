@@ -41,3 +41,13 @@ def creator_usage(
     current_user: models.User = Depends(require_role("admin", "superadmin")),
 ):
     return crud.get_creator_usage(db, start_date=start_date, end_date=end_date)
+
+
+@router.get("/general-expenses-monthly", response_model=List[schemas.GeneralExpenseMonthlyItem])
+def general_expenses_monthly(
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role("admin", "superadmin")),
+):
+    return crud.get_general_expenses_monthly(db, start_date=start_date, end_date=end_date)

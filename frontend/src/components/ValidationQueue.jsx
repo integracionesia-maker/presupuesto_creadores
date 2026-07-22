@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { approveTicket, fetchTickets, rejectTicket } from "../api";
+import { approveTicket, fetchTickets, hardDeleteTicket, rejectTicket, softDeleteTicket } from "../api";
 import { PRIORITY_BADGE_CLASS, PRIORITY_LABELS } from "../utils/priority";
+import DeleteConfirmModal from "./DeleteConfirmModal";
 import MediaViewerModal from "./MediaViewerModal";
 import Modal from "./Modal";
 
@@ -31,6 +32,7 @@ export default function ValidationQueue({ onChange }) {
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -175,6 +177,9 @@ export default function ValidationQueue({ onChange }) {
                         >
                           Rechazar
                         </button>
+                        <button onClick={() => setDeleteTarget(t)} className="btn-go-ghost text-xs px-3 py-1.5">
+                          Eliminar
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -249,6 +254,23 @@ export default function ValidationQueue({ onChange }) {
             </div>
           </div>
         </Modal>
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          itemLabel={`el ticket de ${deleteTarget.creator_name} por ${formatCurrency(deleteTarget.amount)}`}
+          onClose={() => setDeleteTarget(null)}
+          onSoftDelete={async () => {
+            await softDeleteTicket(deleteTarget.id);
+            load();
+            if (onChange) onChange();
+          }}
+          onHardDelete={async () => {
+            await hardDeleteTicket(deleteTarget.id);
+            load();
+            if (onChange) onChange();
+          }}
+        />
       )}
     </div>
   );
