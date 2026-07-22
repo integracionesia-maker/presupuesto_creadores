@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { fetchTickets } from "../api";
 import { PRIORITY_BADGE_CLASS, PRIORITY_LABELS } from "../utils/priority";
 import MediaViewerModal from "./MediaViewerModal";
+import { SortableHeaderCell } from "./SortableHeader";
+import { useSortable } from "../hooks/useSortable";
 
 const PAGE_SIZES = [10, 25, 50, 100];
 
@@ -14,34 +16,11 @@ const STATUS_BADGE_CLASS = {
 
 /* Columnas ordenables: key = campo del ticket */
 const SORTABLE_COLUMNS = [
-  { key: "upload_date", label: "Fecha de carga" },
-  { key: "creator_name", label: "Creador" },
-  { key: "brand_name", label: "Marca" },
-  { key: "amount", label: "Monto", align: "right" },
+  { key: "upload_date", label: "Fecha de carga", type: "date" },
+  { key: "creator_name", label: "Creador", type: "string" },
+  { key: "brand_name", label: "Marca", type: "string" },
+  { key: "amount", label: "Monto", align: "right", type: "number" },
 ];
-
-function SortIcon({ dir }) {
-  if (dir === "asc") {
-    return (
-      <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
-      </svg>
-    );
-  }
-  if (dir === "desc") {
-    return (
-      <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-      </svg>
-    );
-  }
-  /* Estado predeterminado: doble chevron tenue */
-  return (
-    <svg className="h-3 w-3 opacity-40" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4M8 15l4 4 4-4" />
-    </svg>
-  );
-}
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat("es-MX", {
@@ -75,48 +54,22 @@ export default function TransactionTable({ creators, brands }) {
 
   const [viewerTicket, setViewerTicket] = useState(null);
 
-  /* Orden de 3 estados: null (predeterminado) → "asc" → "desc" → null */
-  const [sortKey, setSortKey] = useState(null);
-  const [sortDir, setSortDir] = useState(null);
-
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-
-  const cycleSort = (key) => {
-    if (sortKey !== key) {
-      setSortKey(key);
-      setSortDir("asc");
-    } else if (sortDir === "asc") {
-      setSortDir("desc");
-    } else {
-      setSortKey(null);
-      setSortDir(null);
-    }
-    setPage(1);
-  };
 
   const filteredTickets = useMemo(() => {
     if (!filterPriority) return tickets;
     return tickets.filter((t) => t.brand_priority === filterPriority);
   }, [tickets, filterPriority]);
 
-  const sortedTickets = useMemo(() => {
-    if (!sortKey || !sortDir) return filteredTickets; // orden predeterminado (fecha desc, del backend)
-    const sorted = [...filteredTickets].sort((a, b) => {
-      let cmp;
-      if (sortKey === "amount") {
-        cmp = a.amount - b.amount;
-      } else if (sortKey === "upload_date") {
-        cmp = new Date(a.upload_date) - new Date(b.upload_date);
-      } else {
-        cmp = (a[sortKey] || "").localeCompare(b[sortKey] || "", "es", {
-          sensitivity: "base",
-        });
-      }
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    return sorted;
-  }, [filteredTickets, sortKey, sortDir]);
+  const { sortedItems: sortedTickets, sortKey, sortDir, cycleSort: cycleSortRaw } = useSortable(
+    filteredTickets,
+    SORTABLE_COLUMNS
+  );
+  const cycleSort = (key) => {
+    cycleSortRaw(key);
+    setPage(1);
+  };
 
   const totalPages = Math.max(1, Math.ceil(sortedTickets.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -311,30 +264,17 @@ export default function TransactionTable({ creators, brands }) {
           <table className="go-table">
             <thead>
               <tr>
-                {SORTABLE_COLUMNS.map((col) => {
-                  const active = sortKey === col.key;
-                  return (
-                    <th key={col.key} className={col.align === "right" ? "text-right" : ""}>
-                      <button
-                        onClick={() => cycleSort(col.key)}
-                        title={
-                          !active
-                            ? "Ordenar ascendente"
-                            : sortDir === "asc"
-                            ? "Ordenar descendente"
-                            : "Quitar orden"
-                        }
-                        className={`inline-flex items-center gap-1.5 font-display text-[11px] font-bold uppercase tracking-[0.10em] transition-colors ${
-                          col.align === "right" ? "justify-end" : ""
-                        }`}
-                        style={{ color: active ? "var(--go-orange)" : "inherit" }}
-                      >
-                        {col.label}
-                        <SortIcon dir={active ? sortDir : null} />
-                      </button>
-                    </th>
-                  );
-                })}
+                {SORTABLE_COLUMNS.map((col) => (
+                  <SortableHeaderCell
+                    key={col.key}
+                    label={col.label}
+                    columnKey={col.key}
+                    activeKey={sortKey}
+                    dir={sortDir}
+                    onSort={cycleSort}
+                    align={col.align}
+                  />
+                ))}
                 <th className="text-center">Estado</th>
                 <th className="text-center">Comprobante</th>
               </tr>

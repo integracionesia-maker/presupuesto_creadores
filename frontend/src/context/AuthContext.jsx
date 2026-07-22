@@ -1,22 +1,46 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { fetchMe, login as apiLogin, logout as apiLogout, setAuthFailureHandler } from "../api";
+import { fetchMe, login as apiLogin, logout as apiLogout, setAuthFailureHandler, isNetworkError } from "../api";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [networkError, setNetworkError] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     setAuthFailureHandler(() => setUser(null));
   }, []);
 
-  useEffect(() => {
-    fetchMe()
-      .then(setUser)
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+  // Determina la sesión vigente. Si falla por red (no por 401 real) no debe
+  // interpretarse como "sin sesión" — ProtectedRoute usa `networkError` para
+  // mostrar el estado "sin conexión" en vez de mandar a /login engañosamente.
+  // `isRetry` distingue el chequeo inicial (usa `loading`, como siempre) del
+  // que dispara el botón "Reintentar" (usa `retrying`) — así ProtectedRoute
+  // nunca vuelve a mostrar el spinner genérico durante un reintento, solo
+  // LoadingScreen (evita el parpadeo entre dos loaders distintos).
+  const checkSession = useCallback(async (isRetry = false) => {
+    if (isRetry) setRetrying(true);
+    else setLoading(true);
+    setNetworkError(false);
+    try {
+      const me = await fetchMe();
+      setUser(me);
+    } catch (e) {
+      setUser(null);
+      setNetworkError(isNetworkError(e));
+    } finally {
+      if (isRetry) setRetrying(false);
+      else setLoading(false);
+    }
   }, []);
+
+  const retryCheckSession = useCallback(() => checkSession(true), [checkSession]);
+
+  useEffect(() => {
+    checkSession(false);
+  }, [checkSession]);
 
   const login = useCallback(async (identificador, password) => {
     const { user: loggedInUser } = await apiLogin(identificador, password);
@@ -41,6 +65,9 @@ export function AuthProvider({ children }) {
   const value = {
     user,
     loading,
+    networkError,
+    retrying,
+    retryCheckSession,
     isAuthenticated: !!user,
     login,
     logout,

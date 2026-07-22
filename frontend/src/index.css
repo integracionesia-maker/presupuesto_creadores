@@ -261,3 +261,49 @@
 :root[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
   filter: none;
 }
+
+/* ── Pantalla de carga (LoadingScreen) ────────────────────────────────── */
+@keyframes go-logo-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.82;
+  }
+}
+.go-loading-logo {
+  animation: go-logo-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes go-progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+.go-progress-fill {
+  animation: go-progress-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes go-phrase-fade {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.go-loading-phrase {
+  animation: go-phrase-fade 4s ease-in-out;
+}

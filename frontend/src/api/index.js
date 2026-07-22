@@ -8,6 +8,21 @@
 const BASE = "/api";
 const NO_RETRY_PATHS = ["/auth/login", "/auth/refresh"];
 
+/**
+ * Distingue una falla de RED (el fetch nunca obtuvo respuesta — servidor
+ * caído, sin internet) de un error HTTP normal (el servidor respondió con
+ * un status de error, manejado por `request()` arriba con `body.detail`).
+ * El Fetch API siempre lanza `TypeError` para fallas de red en todos los
+ * navegadores (Chrome: "Failed to fetch", Firefox: "NetworkError...",
+ * Safari: "Load failed") — se complementa con un chequeo de mensaje por si
+ * algún entorno lanza otro tipo de error para el mismo caso.
+ */
+export function isNetworkError(e) {
+  if (!e) return false;
+  if (e instanceof TypeError) return true;
+  return /failed to fetch|network ?error|internet_disconnected|load failed/i.test(String(e.message || ""));
+}
+
 let onAuthFailure = null;
 export function setAuthFailureHandler(handler) {
   onAuthFailure = handler;

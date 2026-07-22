@@ -4,6 +4,17 @@ import { useAuth } from "../context/AuthContext";
 import { PRIORITY_BADGE_CLASS, PRIORITY_LABELS } from "../utils/priority";
 import Modal from "./Modal";
 import UserManagement from "./UserManagement";
+import { SortableHeaderCell } from "./SortableHeader";
+import { useSortable } from "../hooks/useSortable";
+
+const CREATOR_COLUMNS = [
+  { key: "name", label: "Nombre", type: "string" },
+  { key: "cycle_amount", label: "Presupuesto", type: "number", align: "right" },
+  { key: "cycle_spent", label: "Gastado", type: "number", align: "right" },
+  { key: "cycle_remaining", label: "Restante", type: "number", align: "right" },
+];
+
+const BRAND_COLUMNS = [{ key: "name", label: "Nombre", type: "string" }];
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat("es-MX", {
@@ -24,6 +35,19 @@ export default function AdminView({ creators, brands, onChange }) {
   const visibleSections = SECTIONS.filter((s) => !s.roles || s.roles.includes(user.role));
 
   const [section, setSection] = useState("creators");
+
+  const {
+    sortedItems: sortedCreators,
+    sortKey: creatorSortKey,
+    sortDir: creatorSortDir,
+    cycleSort: cycleCreatorSort,
+  } = useSortable(creators, CREATOR_COLUMNS);
+  const {
+    sortedItems: sortedBrands,
+    sortKey: brandSortKey,
+    sortDir: brandSortDir,
+    cycleSort: cycleBrandSort,
+  } = useSortable(brands, BRAND_COLUMNS);
 
   /* Creator form modal (create when editingCreator === null, edit otherwise) */
   const [creatorFormOpen, setCreatorFormOpen] = useState(false);
@@ -326,17 +350,44 @@ export default function AdminView({ creators, brands, onChange }) {
               <table className="go-table">
                 <thead>
                   <tr>
-                    <th>Nombre</th>
+                    <SortableHeaderCell
+                      label="Nombre"
+                      columnKey="name"
+                      activeKey={creatorSortKey}
+                      dir={creatorSortDir}
+                      onSort={cycleCreatorSort}
+                    />
                     <th className="text-center">Ciclo</th>
-                    <th className="text-right">Monto</th>
-                    <th className="text-right">Gastado</th>
-                    <th className="text-right">Restante</th>
+                    <SortableHeaderCell
+                      label="Presupuesto"
+                      columnKey="cycle_amount"
+                      activeKey={creatorSortKey}
+                      dir={creatorSortDir}
+                      onSort={cycleCreatorSort}
+                      align="right"
+                    />
+                    <SortableHeaderCell
+                      label="Gastado"
+                      columnKey="cycle_spent"
+                      activeKey={creatorSortKey}
+                      dir={creatorSortDir}
+                      onSort={cycleCreatorSort}
+                      align="right"
+                    />
+                    <SortableHeaderCell
+                      label="Restante"
+                      columnKey="cycle_remaining"
+                      activeKey={creatorSortKey}
+                      dir={creatorSortDir}
+                      onSort={cycleCreatorSort}
+                      align="right"
+                    />
                     <th className="text-center">Estado</th>
                     <th className="text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {creators.map((c) => (
+                  {sortedCreators.map((c) => (
                     <tr key={c.id}>
                       <td>
                         <span
@@ -434,14 +485,20 @@ export default function AdminView({ creators, brands, onChange }) {
               <table className="go-table">
                 <thead>
                   <tr>
-                    <th>Nombre</th>
+                    <SortableHeaderCell
+                      label="Nombre"
+                      columnKey="name"
+                      activeKey={brandSortKey}
+                      dir={brandSortDir}
+                      onSort={cycleBrandSort}
+                    />
                     <th className="text-center">Prioridad</th>
                     <th className="text-center">Estado</th>
                     <th className="text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {brands.map((b) => (
+                  {sortedBrands.map((b) => (
                     <tr key={b.id}>
                       <td>
                         <span

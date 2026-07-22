@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import LoadingScreen from "./LoadingScreen";
 
 function FullScreenSpinner() {
   return (
@@ -18,13 +19,23 @@ function FullScreenSpinner() {
 /**
  * Guard de rutas: sin sesión -> /login (preservando destino); con sesión pero
  * must_change_password pendiente -> /perfil; con sesión pero rol no permitido -> /403.
+ * Si la verificación de sesión falla por red (no por 401 real), muestra el
+ * estado "sin conexión" (R1) en vez de mandar a /login engañosamente.
  */
 export default function ProtectedRoute({ roles, children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, networkError, retrying, retryCheckSession } = useAuth();
   const location = useLocation();
 
   if (loading) {
     return <FullScreenSpinner />;
+  }
+
+  if (networkError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center" style={{ background: "var(--go-bg)" }}>
+        <LoadingScreen isOffline={!retrying} onRetry={retryCheckSession} />
+      </div>
+    );
   }
 
   if (!user) {

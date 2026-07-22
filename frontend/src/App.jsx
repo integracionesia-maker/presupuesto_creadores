@@ -9,12 +9,13 @@ import AdminView from "./components/AdminView";
 import ValidationQueue from "./components/ValidationQueue";
 import UploadTicketModal from "./components/UploadTicketModal";
 import ProtectedRoute from "./components/ProtectedRoute";
+import LoadingScreen from "./components/LoadingScreen";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import ForbiddenPage from "./pages/ForbiddenPage";
 import { useAuth } from "./context/AuthContext";
-import { fetchCreators, fetchCreatorsKpi, fetchBrands, fetchTickets } from "./api";
+import { fetchCreators, fetchCreatorsKpi, fetchBrands, fetchTickets, isNetworkError } from "./api";
 
 const ADMIN_ROLES = ["admin", "superadmin"];
 
@@ -25,26 +26,6 @@ function firstOfMonth(y, m) {
 function today() {
   const t = new Date();
   return new Date(t.getFullYear(), t.getMonth(), t.getDate());
-}
-
-function LoadingSpinner() {
-  return (
-    <div className="flex items-center justify-center py-32">
-      <div
-        className="h-10 w-10 animate-spin rounded-full border-[3px]"
-        style={{
-          borderColor: "var(--go-border)",
-          borderTopColor: "var(--go-orange)",
-        }}
-      />
-      <span
-        className="ml-3 font-body text-sm"
-        style={{ color: "var(--go-text-secondary)" }}
-      >
-        Cargando datos...
-      </span>
-    </div>
-  );
 }
 
 export default function App() {
@@ -79,6 +60,7 @@ function AppShell() {
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [networkError, setNetworkError] = useState(false);
 
   const [dateRange, setDateRange] = useState(() => {
     const t = today();
@@ -94,7 +76,10 @@ function AppShell() {
   };
 
   const loadData = useCallback(async ({ silent = false } = {}) => {
-    if (!silent) setLoading(true);
+    if (!silent) {
+      setLoading(true);
+      setNetworkError(false);
+    }
     setError(null);
     try {
       const [c, k, b, pending] = await Promise.all([
@@ -108,7 +93,19 @@ function AppShell() {
       setBrands(b);
       setPendingCount(pending.length);
     } catch (e) {
-      setError(e.message);
+      if (isNetworkError(e)) {
+        // Una recarga "silent" (después de crear/aprobar/editar algo) nunca debe
+        // tapar la página con la pantalla de sin conexión — desmontaría un
+        // formulario abierto por una falla transitoria. Se degrada al banner
+        // de error normal, igual que cualquier otro error en una carga silent.
+        if (!silent) {
+          setNetworkError(true);
+        } else {
+          setError("Se perdió la conexión con el servidor. Los datos podrían estar desactualizados.");
+        }
+      } else {
+        setError(e.message);
+      }
     } finally {
       if (!silent) setLoading(false);
     }
@@ -168,8 +165,8 @@ function AppShell() {
               path="/dashboard"
               element={
                 <ProtectedRoute roles={ADMIN_ROLES}>
-                  {loading ? (
-                    <LoadingSpinner />
+                  {loading || networkError ? (
+                    <LoadingScreen isOffline={networkError} onRetry={loadData} />
                   ) : (
                     <Dashboard
                       kpi={kpi}
@@ -186,15 +183,19 @@ function AppShell() {
               path="/creadores"
               element={
                 <ProtectedRoute roles={ADMIN_ROLES}>
-                  {loading ? <LoadingSpinner /> : <CreatorList creators={creators} />}
+                  {loading || networkError ? (
+                    <LoadingScreen isOffline={networkError} onRetry={loadData} />
+                  ) : (
+                    <CreatorList creators={creators} />
+                  )}
                 </ProtectedRoute>
               }
             />
             <Route
               path="/transacciones"
               element={
-                loading ? (
-                  <LoadingSpinner />
+                loading || networkError ? (
+                  <LoadingScreen isOffline={networkError} onRetry={loadData} />
                 ) : (
                   <TransactionTable creators={creators} brands={brands} />
                 )
@@ -204,8 +205,8 @@ function AppShell() {
               path="/administracion"
               element={
                 <ProtectedRoute roles={ADMIN_ROLES}>
-                  {loading ? (
-                    <LoadingSpinner />
+                  {loading || networkError ? (
+                    <LoadingScreen isOffline={networkError} onRetry={loadData} />
                   ) : (
                     <AdminView
                       creators={creators}

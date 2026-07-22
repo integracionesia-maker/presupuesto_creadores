@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { createUser, fetchUsers, resetUserPassword, setUserActive, updateUser } from "../api";
 import { useAuth } from "../context/AuthContext";
 import Modal from "./Modal";
+import { SortableHeaderCell } from "./SortableHeader";
+import { useSortable } from "../hooks/useSortable";
 
 const ROLE_LABELS = {
   superadmin: "Superadministrador",
@@ -13,6 +15,18 @@ const ROLE_OPTIONS = [
   { value: "admin", label: "Administrador" },
   { value: "creador", label: "Creador" },
 ];
+
+const USER_COLUMNS = [
+  { key: "full_name", label: "Nombre", type: "string" },
+  { key: "role", label: "Rol", type: "string", getValue: (u) => ROLE_LABELS[u.role] || u.role },
+  { key: "is_active", label: "Estado", type: "string", getValue: (u) => (u.is_active ? "Activo" : "Inactivo") },
+  { key: "last_login", label: "Último acceso", type: "date" },
+];
+
+function formatLastLogin(iso) {
+  if (!iso) return "Nunca";
+  return new Date(iso).toLocaleDateString("es-MX", { year: "numeric", month: "short", day: "numeric" });
+}
 
 function emptyForm() {
   return { username: "", email: "", full_name: "", role: "creador", creator_id: "", password: "" };
@@ -34,6 +48,8 @@ export default function UserManagement({ creators }) {
   const [confirmToggle, setConfirmToggle] = useState(null);
 
   const [resetResult, setResetResult] = useState(null);
+
+  const { sortedItems: sortedUsers, sortKey, sortDir, cycleSort } = useSortable(users, USER_COLUMNS);
 
   const load = async () => {
     setLoading(true);
@@ -180,15 +196,29 @@ export default function UserManagement({ creators }) {
             <thead>
               <tr>
                 <th>Usuario</th>
-                <th>Nombre</th>
+                <SortableHeaderCell label="Nombre" columnKey="full_name" activeKey={sortKey} dir={sortDir} onSort={cycleSort} />
                 <th>Correo</th>
-                <th>Rol</th>
-                <th className="text-center">Estado</th>
+                <SortableHeaderCell label="Rol" columnKey="role" activeKey={sortKey} dir={sortDir} onSort={cycleSort} />
+                <SortableHeaderCell
+                  label="Estado"
+                  columnKey="is_active"
+                  activeKey={sortKey}
+                  dir={sortDir}
+                  onSort={cycleSort}
+                  align="center"
+                />
+                <SortableHeaderCell
+                  label="Último acceso"
+                  columnKey="last_login"
+                  activeKey={sortKey}
+                  dir={sortDir}
+                  onSort={cycleSort}
+                />
                 <th className="text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => {
+              {sortedUsers.map((u) => {
                 const isSelf = u.id === currentUser.id;
                 const isTargetSuperadmin = u.role === "superadmin";
                 return (
@@ -215,6 +245,9 @@ export default function UserManagement({ creators }) {
                       <span className={`go-badge ${u.is_active ? "go-badge-success" : "go-badge-error"}`}>
                         {u.is_active ? "Activo" : "Inactivo"}
                       </span>
+                    </td>
+                    <td className="font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
+                      {formatLastLogin(u.last_login)}
                     </td>
                     <td>
                       <div className="flex items-center justify-end gap-2">
