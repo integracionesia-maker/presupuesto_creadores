@@ -67,7 +67,7 @@ export default function DateRangeFilter({ startDate, endDate, onChange }) {
   return (
     <div className="flex flex-wrap items-end gap-3">
       {/* ── Desde ──────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-1 flex-col gap-1 sm:flex-none">
         <label
           className="font-display text-[11px] font-bold uppercase tracking-[0.14em]"
           style={{ color: "var(--go-orange)" }}
@@ -81,12 +81,12 @@ export default function DateRangeFilter({ startDate, endDate, onChange }) {
             const d = e.target.value ? new Date(e.target.value + "T00:00:00") : null;
             onChange(d, endDate);
           }}
-          className="go-input w-[160px]"
+          className="go-input w-full min-w-[140px] sm:w-[160px]"
         />
       </div>
 
       {/* ── Hasta ──────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-1 flex-col gap-1 sm:flex-none">
         <label
           className="font-display text-[11px] font-bold uppercase tracking-[0.14em]"
           style={{ color: "var(--go-orange)" }}
@@ -100,7 +100,7 @@ export default function DateRangeFilter({ startDate, endDate, onChange }) {
             const d = e.target.value ? new Date(e.target.value + "T00:00:00") : null;
             onChange(startDate, d);
           }}
-          className="go-input w-[160px]"
+          className="go-input w-full min-w-[140px] sm:w-[160px]"
         />
       </div>
 

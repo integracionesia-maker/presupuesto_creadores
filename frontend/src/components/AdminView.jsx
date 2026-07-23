@@ -6,6 +6,7 @@ import Modal from "./Modal";
 import UserManagement from "./UserManagement";
 import { SortableHeaderCell } from "./SortableHeader";
 import { useSortable } from "../hooks/useSortable";
+import RowActions from "./RowActions";
 
 const CREATOR_COLUMNS = [
   { key: "name", label: "Nombre", type: "string" },
@@ -302,7 +303,7 @@ export default function AdminView({ creators, brands, onChange }) {
               <button
                 key={s.key}
                 onClick={() => setSection(s.key)}
-                className="rounded-go px-4 py-1.5 font-display text-sm font-semibold tracking-wide transition-all duration-200"
+                className="rounded-go px-3 sm:px-4 py-1.5 font-display text-xs sm:text-sm font-semibold tracking-wide transition-all duration-200"
                 style={{
                   background: isActive ? "var(--go-surface-sunken)" : "transparent",
                   color: isActive ? "var(--go-orange)" : "var(--go-text-secondary)",
@@ -343,8 +344,9 @@ export default function AdminView({ creators, brands, onChange }) {
               <p>No hay creadores registrados.</p>
             </div>
           ) : (
+            <div className="go-table-scroll-wrapper">
             <div
-              className="overflow-x-auto rounded-go-lg border"
+              className="overflow-x-auto rounded-go-lg border go-table-scroll"
               style={{ borderColor: "var(--go-border)" }}
             >
               <table className="go-table">
@@ -420,31 +422,24 @@ export default function AdminView({ creators, brands, onChange }) {
                         </span>
                       </td>
                       <td>
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => openCreatorForm(c)}
-                            className="btn-go-ghost text-xs px-3 py-1.5"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => openCycleHistory(c)}
-                            className="btn-go-ghost text-xs px-3 py-1.5"
-                          >
-                            Histórico
-                          </button>
-                          <button
-                            onClick={() => openConfirmToggle("creator", c)}
-                            className="btn-go-ghost text-xs px-3 py-1.5"
-                          >
-                            {c.is_active ? "Desactivar" : "Activar"}
-                          </button>
-                        </div>
+                        <RowActions
+                          actions={[
+                            { key: "editar", label: "Editar", onClick: () => openCreatorForm(c) },
+                            { key: "historico", label: "Histórico", onClick: () => openCycleHistory(c) },
+                            {
+                              key: "toggle",
+                              label: c.is_active ? "Desactivar" : "Activar",
+                              variant: c.is_active ? "danger" : undefined,
+                              onClick: () => openConfirmToggle("creator", c),
+                            },
+                          ]}
+                        />
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </div>
@@ -478,8 +473,9 @@ export default function AdminView({ creators, brands, onChange }) {
               <p>No hay marcas registradas.</p>
             </div>
           ) : (
+            <div className="go-table-scroll-wrapper">
             <div
-              className="overflow-x-auto rounded-go-lg border"
+              className="overflow-x-auto rounded-go-lg border go-table-scroll"
               style={{ borderColor: "var(--go-border)" }}
             >
               <table className="go-table">
@@ -519,25 +515,23 @@ export default function AdminView({ creators, brands, onChange }) {
                         </span>
                       </td>
                       <td>
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => openBrandForm(b)}
-                            className="btn-go-ghost text-xs px-3 py-1.5"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => openConfirmToggle("brand", b)}
-                            className="btn-go-ghost text-xs px-3 py-1.5"
-                          >
-                            {b.is_active ? "Desactivar" : "Activar"}
-                          </button>
-                        </div>
+                        <RowActions
+                          actions={[
+                            { key: "editar", label: "Editar", onClick: () => openBrandForm(b) },
+                            {
+                              key: "toggle",
+                              label: b.is_active ? "Desactivar" : "Activar",
+                              variant: b.is_active ? "danger" : undefined,
+                              onClick: () => openConfirmToggle("brand", b),
+                            },
+                          ]}
+                        />
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
             </div>
           )}
         </div>
@@ -553,7 +547,7 @@ export default function AdminView({ creators, brands, onChange }) {
           onClose={closeCreatorForm}
           submitting={submitting}
         >
-          <form onSubmit={handleCreatorSubmit} className="space-y-4 px-6 py-5">
+          <form onSubmit={handleCreatorSubmit} className="space-y-4 px-4 sm:px-6 py-5">
             <div>
               <label className="go-eyebrow mb-1.5 block">Nombre</label>
               <input
@@ -652,7 +646,7 @@ export default function AdminView({ creators, brands, onChange }) {
           onClose={closeBrandForm}
           submitting={submitting}
         >
-          <form onSubmit={handleBrandSubmit} className="space-y-4 px-6 py-5">
+          <form onSubmit={handleBrandSubmit} className="space-y-4 px-4 sm:px-6 py-5">
             <div>
               <label className="go-eyebrow mb-1.5 block">Nombre</label>
               <input
@@ -715,7 +709,7 @@ export default function AdminView({ creators, brands, onChange }) {
           onClose={closeConfirmToggle}
           submitting={submitting}
         >
-          <div className="space-y-4 px-6 py-5">
+          <div className="space-y-4 px-4 sm:px-6 py-5">
             <p className="font-body text-sm" style={{ color: "var(--go-text-primary)" }}>
               {toggleText}
             </p>
@@ -757,7 +751,7 @@ export default function AdminView({ creators, brands, onChange }) {
           title={`Histórico de ciclos — ${cycleHistoryCreator.name}`}
           onClose={closeCycleHistory}
         >
-          <div className="space-y-4 px-6 py-5">
+          <div className="space-y-4 px-4 sm:px-6 py-5">
             {cycleHistoryLoading ? (
               <p className="font-body text-sm" style={{ color: "var(--go-text-secondary)" }}>
                 Cargando...
@@ -767,34 +761,36 @@ export default function AdminView({ creators, brands, onChange }) {
                 Sin ciclos registrados todavía.
               </p>
             ) : (
-              <div className="max-h-[60vh] overflow-y-auto overflow-x-auto rounded-go-lg border" style={{ borderColor: "var(--go-border)" }}>
-                <table className="go-table">
-                  <thead>
-                    <tr>
-                      <th>Periodo</th>
-                      <th className="text-right">Monto</th>
-                      <th className="text-right">Gastado</th>
-                      <th className="text-right">Restante</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cycleHistory.map((cy) => (
-                      <tr key={cy.id}>
-                        <td>{cy.start_date} — {cy.end_date}</td>
-                        <td className="num text-right">{formatCurrency(cy.amount)}</td>
-                        <td className="num text-right" style={{ color: "var(--go-warning)" }}>
-                          {formatCurrency(cy.spent)}
-                        </td>
-                        <td
-                          className="num text-right font-semibold"
-                          style={{ color: cy.remaining <= 0 ? "var(--go-error)" : "var(--go-success)" }}
-                        >
-                          {formatCurrency(cy.remaining)}
-                        </td>
+              <div className="go-table-scroll-wrapper">
+                <div className="max-h-[60vh] overflow-y-auto overflow-x-auto rounded-go-lg border go-table-scroll" style={{ borderColor: "var(--go-border)" }}>
+                  <table className="go-table">
+                    <thead>
+                      <tr>
+                        <th>Periodo</th>
+                        <th className="text-right">Monto</th>
+                        <th className="text-right">Gastado</th>
+                        <th className="text-right">Restante</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {cycleHistory.map((cy) => (
+                        <tr key={cy.id}>
+                          <td>{cy.start_date} — {cy.end_date}</td>
+                          <td className="num text-right">{formatCurrency(cy.amount)}</td>
+                          <td className="num text-right" style={{ color: "var(--go-warning)" }}>
+                            {formatCurrency(cy.spent)}
+                          </td>
+                          <td
+                            className="num text-right font-semibold"
+                            style={{ color: cy.remaining <= 0 ? "var(--go-error)" : "var(--go-success)" }}
+                          >
+                            {formatCurrency(cy.remaining)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 

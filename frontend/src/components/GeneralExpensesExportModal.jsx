@@ -4,6 +4,7 @@ import GeneralExpensesPdfTemplate from "./PdfReport/GeneralExpensesPdfTemplate";
 import { generateGeneralExpensesPdf } from "./PdfReport/generateGeneralExpensesPdf";
 import { useAuth } from "../context/AuthContext";
 import { fetchGeneralExpensesExport } from "../api";
+import { useMobile } from "../hooks/useMobile";
 
 /** Genera los valores YYYY-MM para los últimos `count` meses (incluyendo el actual). */
 function lastNMonths(count) {
@@ -25,6 +26,7 @@ const PRESETS = [
 
 export default function GeneralExpensesExportModal({ onClose }) {
   const { user } = useAuth();
+  const isMobile = useMobile();
   const months = useMemo(() => lastNMonths(12), []);
 
   const [selectedMonths, setSelectedMonths] = useState([]);
@@ -85,7 +87,9 @@ export default function GeneralExpensesExportModal({ onClose }) {
     if (!s) return s;
     const [y, m] = s.split("-");
     const d = new Date(Number(y), Number(m) - 1, 1);
-    const monthName = new Intl.DateTimeFormat("es-MX", { month: "long" }).format(d);
+    // En móvil, "Jul 2026" en vez de "Julio 2026" — dos columnas de ~140px
+    // no alcanzan para el nombre completo del mes (auditoría móvil, M5).
+    const monthName = new Intl.DateTimeFormat("es-MX", { month: isMobile ? "short" : "long" }).format(d);
     return `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${y}`;
   };
 
@@ -98,7 +102,7 @@ export default function GeneralExpensesExportModal({ onClose }) {
 
   return (
     <Modal title="Exportar Gastos Generales" onClose={onClose} submitting={submitting}>
-      <div className="space-y-4 px-6 py-5">
+      <div className="space-y-4 px-4 sm:px-6 py-5">
         <p className="font-body text-sm" style={{ color: "var(--go-text-secondary)" }}>
           Selecciona los meses que quieres incluir en el reporte.
         </p>

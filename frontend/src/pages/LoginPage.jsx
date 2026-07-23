@@ -40,7 +40,7 @@ export default function LoginPage() {
     >
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3">
-          <BrandLogo variant="imagotipo" className="h-28 w-auto" />
+          <BrandLogo variant="imagotipo" className="h-20 sm:h-28 w-auto" />
           <div className="text-center">
             <h1
               className="font-display text-lg font-bold uppercase tracking-[0.06em]"

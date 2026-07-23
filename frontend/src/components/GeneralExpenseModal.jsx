@@ -130,7 +130,7 @@ export default function GeneralExpenseModal({ onClose, onSuccess }) {
       >
         {/* ── Header ──────────────────────────────────────────────── */}
         <div
-          className="flex items-center justify-between px-6 py-4"
+          className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4"
           style={{ borderBottom: "1px solid var(--go-border)" }}
         >
           <h2
@@ -153,7 +153,7 @@ export default function GeneralExpenseModal({ onClose, onSuccess }) {
         </div>
 
         {/* ── Body ────────────────────────────────────────────────── */}
-        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+        <form onSubmit={handleSubmit} className="space-y-4 px-4 sm:px-6 py-5">
           {/* Description */}
           <div>
             <label className="go-eyebrow mb-1.5 block">Descripción</label>
@@ -201,7 +201,7 @@ export default function GeneralExpenseModal({ onClose, onSuccess }) {
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              className="relative flex cursor-pointer flex-col items-center justify-center rounded-go-lg border-2 border-dashed px-6 py-7 transition-colors"
+              className="relative flex cursor-pointer flex-col items-center justify-center rounded-go-lg border-2 border-dashed px-6 py-4 sm:py-7 transition-colors"
               style={{
                 borderColor: dragOver
                   ? "var(--go-orange)"

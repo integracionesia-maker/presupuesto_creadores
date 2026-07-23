@@ -3,6 +3,7 @@ import { fetchTickets, softDeleteTicket, hardDeleteTicket } from "../api";
 import { PRIORITY_BADGE_CLASS, PRIORITY_LABELS } from "../utils/priority";
 import MediaViewerModal from "./MediaViewerModal";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import RowActions from "./RowActions";
 import { SortableHeaderCell } from "./SortableHeader";
 import { useSortable } from "../hooks/useSortable";
 import { useAuth } from "../context/AuthContext";
@@ -134,7 +135,7 @@ export default function TransactionTable({ creators, brands, onChange }) {
         className="flex flex-wrap gap-4 rounded-go-lg p-4"
         style={{ background: "var(--go-surface)", border: "1px solid var(--go-border)" }}
       >
-        <div className="min-w-[200px] flex-1">
+        <div className="min-w-0 flex-1 sm:min-w-[200px]">
           <label className="go-eyebrow mb-1.5 block">Filtrar por Creador</label>
           <div className="relative">
             <input
@@ -161,7 +162,7 @@ export default function TransactionTable({ creators, brands, onChange }) {
           </div>
         </div>
 
-        <div className="min-w-[180px] flex-1">
+        <div className="min-w-0 flex-1 sm:min-w-[180px]">
           <label className="go-eyebrow mb-1.5 block">Filtrar por Marca</label>
           <select
             value={filterBrand}
@@ -177,7 +178,7 @@ export default function TransactionTable({ creators, brands, onChange }) {
           </select>
         </div>
 
-        <div className="min-w-[160px]">
+        <div className="min-w-0 sm:min-w-[160px]">
           <label className="go-eyebrow mb-1.5 block">Prioridad</label>
           <select
             value={filterPriority}
@@ -191,7 +192,7 @@ export default function TransactionTable({ creators, brands, onChange }) {
           </select>
         </div>
 
-        <div className="min-w-[160px]">
+        <div className="min-w-0 sm:min-w-[160px]">
           <label className="go-eyebrow mb-1.5 block">Estado</label>
           <select
             value={filterStatus}
@@ -204,6 +205,31 @@ export default function TransactionTable({ creators, brands, onChange }) {
             <option value="rechazado">Rechazado</option>
           </select>
         </div>
+
+        {(filterCreator || filterBrand || filterPriority || filterStatus) && (
+          <div className="flex items-end">
+            <button
+              onClick={() => {
+                setFilterCreator("");
+                setFilterBrand("");
+                setFilterPriority("");
+                setFilterStatus("");
+              }}
+              className="btn-go-ghost text-xs px-3 py-1.5"
+            >
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Limpiar filtros
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Error ─────────────────────────────────────────────────────── */}
@@ -264,8 +290,9 @@ export default function TransactionTable({ creators, brands, onChange }) {
 
       {/* ── Table ─────────────────────────────────────────────────────── */}
       {!loading && sortedTickets.length > 0 && (
+        <div className="go-table-scroll-wrapper">
         <div
-          className="overflow-x-auto rounded-go-lg border"
+          className="overflow-x-auto rounded-go-lg border go-table-scroll"
           style={{ borderColor: "var(--go-border)" }}
         >
           <table className="go-table">
@@ -283,8 +310,7 @@ export default function TransactionTable({ creators, brands, onChange }) {
                   />
                 ))}
                 <th className="text-center">Estado</th>
-                <th className="text-center">Comprobante</th>
-                {canDelete && <th className="text-center">Eliminar</th>}
+                <th className="text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -323,35 +349,18 @@ export default function TransactionTable({ creators, brands, onChange }) {
                     </span>
                   </td>
                   <td className="text-center">
-                    <button onClick={() => setViewerTicket(t)} className="btn-go-ghost text-xs px-3 py-1.5">
-                      <svg
-                        className="h-3.5 w-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </svg>
-                      Ver
-                    </button>
+                    <RowActions
+                      actions={[
+                        { key: "ver", label: "Ver", onClick: () => setViewerTicket(t) },
+                        canDelete && {
+                          key: "eliminar",
+                          label: "Eliminar",
+                          variant: "danger",
+                          onClick: () => setDeleteTarget(t),
+                        },
+                      ]}
+                    />
                   </td>
-                  {canDelete && (
-                    <td className="text-center">
-                      <button onClick={() => setDeleteTarget(t)} className="btn-go-ghost text-xs px-3 py-1.5">
-                        Eliminar
-                      </button>
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>
@@ -363,12 +372,17 @@ export default function TransactionTable({ creators, brands, onChange }) {
             style={{ borderTop: "1px solid var(--go-border)" }}
           >
             <span className="font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
-              Mostrando {rangeStart}–{rangeEnd} de {sortedTickets.length}
+              <span className="hidden sm:inline">
+                Mostrando {rangeStart}–{rangeEnd} de {sortedTickets.length}
+              </span>
+              <span className="sm:hidden">
+                {rangeStart}–{rangeEnd}/{sortedTickets.length}
+              </span>
             </span>
 
             <div className="flex flex-wrap items-center gap-3">
               <label
-                className="font-body text-xs"
+                className="hidden sm:inline font-body text-xs"
                 style={{ color: "var(--go-text-secondary)" }}
               >
                 Filas por página
@@ -418,6 +432,7 @@ export default function TransactionTable({ creators, brands, onChange }) {
               </div>
             </div>
           </div>
+        </div>
         </div>
       )}
 

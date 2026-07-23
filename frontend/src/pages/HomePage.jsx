@@ -68,11 +68,11 @@ function SectionCard({ to, onClick, title, description, icon }) {
       onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--go-border)")}
     >
       <div
-        className="flex h-12 w-12 items-center justify-center rounded-go-lg transition-colors duration-200 group-hover:bg-[var(--go-orange-tint)]"
+        className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-go-lg transition-colors duration-200 group-hover:bg-[var(--go-orange-tint)]"
         style={{ background: "var(--go-surface-sunken)" }}
       >
         <svg
-          className="h-6 w-6 transition-colors duration-200 group-hover:text-[var(--go-orange)]"
+          className="h-5 w-5 sm:h-6 sm:w-6 transition-colors duration-200 group-hover:text-[var(--go-orange)]"
           style={{ color: "var(--go-text-secondary)" }}
           fill="none"
           stroke="currentColor"

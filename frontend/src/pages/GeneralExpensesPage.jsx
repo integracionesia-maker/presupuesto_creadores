@@ -3,6 +3,7 @@ import DateRangeFilter from "../components/DateRangeFilter";
 import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import GeneralExpenseModal from "../components/GeneralExpenseModal";
 import GeneralExpensesExportModal from "../components/GeneralExpensesExportModal";
+import RowActions from "../components/RowActions";
 import { fetchGeneralExpenses, softDeleteGeneralExpense, hardDeleteGeneralExpense, generalExpenseFileUrl } from "../api";
 
 function formatCurrency(amount) {
@@ -92,15 +93,15 @@ export default function GeneralExpensesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h2
           className="font-display text-lg font-bold uppercase tracking-[0.06em]"
           style={{ color: "var(--go-text-primary)" }}
         >
           Gastos Generales
         </h2>
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={() => setExportModalOpen(true)} className="btn-go-ghost">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <button type="button" onClick={() => setExportModalOpen(true)} className="btn-go-ghost w-full sm:w-auto">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -110,7 +111,7 @@ export default function GeneralExpensesPage() {
             </svg>
             Exportar
           </button>
-          <button type="button" onClick={() => setCreateModalOpen(true)} className="btn-go">
+          <button type="button" onClick={() => setCreateModalOpen(true)} className="btn-go w-full sm:w-auto">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
@@ -184,74 +185,55 @@ export default function GeneralExpensesPage() {
 
       {/* ── Table ─────────────────────────────────────────────────────── */}
       {!loading && expenses.length > 0 && (
-        <div
-          className="overflow-x-auto rounded-go-lg border"
-          style={{ borderColor: "var(--go-border)" }}
-        >
-          <table className="go-table">
-            <thead>
-              <tr>
-                <th>Fecha</th>
-                <th>Descripción</th>
-                <th className="text-right">Monto</th>
-                <th className="text-center">Comprobante</th>
-                <th className="text-center">Eliminar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {expenses.map((expense) => (
-                <tr key={expense.id}>
-                  <td style={{ color: "var(--go-text-secondary)" }}>
-                    {formatDate(expense.upload_date)}
-                  </td>
-                  <td style={{ color: "var(--go-text-primary)" }}>
-                    {expense.description}
-                  </td>
-                  <td className="num text-right font-semibold" style={{ color: "var(--go-warning)" }}>
-                    {formatCurrency(expense.amount)}
-                  </td>
-                  <td className="text-center">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        window.open(generalExpenseFileUrl(expense.id), "_blank", "noopener,noreferrer")
-                      }
-                      className="btn-go-ghost text-xs px-3 py-1.5"
-                    >
-                      <svg
-                        className="h-3.5 w-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </svg>
-                      Ver
-                    </button>
-                  </td>
-                  <td className="text-center">
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(expense)}
-                      className="btn-go-ghost text-xs px-3 py-1.5"
-                    >
-                      Eliminar
-                    </button>
-                  </td>
+        <div className="go-table-scroll-wrapper">
+          <div
+            className="overflow-x-auto rounded-go-lg border go-table-scroll"
+            style={{ borderColor: "var(--go-border)" }}
+          >
+            <table className="go-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Descripción</th>
+                  <th className="text-right">Monto</th>
+                  <th className="text-center">Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {expenses.map((expense) => (
+                  <tr key={expense.id}>
+                    <td style={{ color: "var(--go-text-secondary)" }}>
+                      {formatDate(expense.upload_date)}
+                    </td>
+                    <td style={{ color: "var(--go-text-primary)" }}>
+                      {expense.description}
+                    </td>
+                    <td className="num text-right font-semibold" style={{ color: "var(--go-warning)" }}>
+                      {formatCurrency(expense.amount)}
+                    </td>
+                    <td className="text-center">
+                      <RowActions
+                        actions={[
+                          {
+                            key: "ver",
+                            label: "Ver",
+                            onClick: () =>
+                              window.open(generalExpenseFileUrl(expense.id), "_blank", "noopener,noreferrer"),
+                          },
+                          {
+                            key: "eliminar",
+                            label: "Eliminar",
+                            variant: "danger",
+                            onClick: () => setDeleteTarget(expense),
+                          },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

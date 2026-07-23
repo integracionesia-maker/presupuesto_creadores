@@ -2,7 +2,7 @@
 
 > Conexiones pool: [[CLAUDE]] | [[context_proyectos]] | [[framework_operative_enforcement/CLAUDE]] | [[framework_operative_enforcement/PLAYBOOK]] | [[framework_operative_enforcement/FRAMEWORK]]
 > Recursos compartidos: [[IDENTIDAD DE MARCA/context_design]] (visual)
-> Archivos del proyecto: [[CLAUDE]] | [[context]] | [[status]] | [[BACKLOG]] | [[RISKS]] | [[MVP_BREAKDOWN]] | [[DESIGN_SYSTEM]] | [[avances_diarios]] | [[doc/auth-arquitectura]] | [[doc/auth-manual-usuario]] | [[doc/presupuestos-y-validacion]] | [[doc/gastos-generales-manual]] | [[doc/borrado-tickets]]
+> Archivos del proyecto: [[CLAUDE]] | [[context]] | [[status]] | [[BACKLOG]] | [[RISKS]] | [[MVP_BREAKDOWN]] | [[DESIGN_SYSTEM]] | [[avances_diarios]] | [[doc/auth-arquitectura]] | [[doc/auth-manual-usuario]] | [[doc/presupuestos-y-validacion]] | [[doc/gastos-generales-manual]] | [[doc/borrado-tickets]] | [[doc/responsividad-movil]]
 
 ## Stack
 
@@ -30,6 +30,7 @@ Primer arranque (o para crear el superadmin si no existe): desde `backend/`, `py
 - No agregar alias manuales de `react`/`react-dom` en `vite.config.js` — causo el bug de "Invalid hook call" (resuelto 2026-07-15). `resolve.dedupe` + `optimizeDeps.include` es suficiente con un solo `node_modules`.
 - En `apexTheme.js`/`createApexOptions`, nunca asignar `stroke`/`fill`/`plotOptions`/`responsive` como `undefined` explicito — ApexCharts 5.x pisa sus defaults internos y truena el dashboard completo sin error boundary.
 - Datos de creadores/marcas: evitar duplicados por acentos al re-seedear (`seed.py` ya usa ortografia con acento — no revertir a versiones sin acento).
+- **Responsividad móvil**: usar `frontend/src/hooks/useMobile.js` (hook `useMobile(breakpoint=640)`) solo cuando Tailwind no alcanza (valores numéricos en JS, ej. `height` de ApexCharts) — para lo demás, clases `sm:`/`md:`. Las acciones por fila de cualquier tabla nueva deben usar `frontend/src/components/RowActions.jsx` (menú `⋯` en móvil) en vez de botones sueltos, para no repetir el colapso de botones que motivó la auditoría. Las tablas con posible overflow horizontal deben envolver su `overflow-x-auto` con la clase `go-table-scroll-wrapper` (+ `go-table-scroll` en el propio div) definida en `index.css`. Detalle completo: `doc/responsividad-movil.md`.
 
 ## Design system
 
@@ -52,6 +53,10 @@ Ciclos de presupuesto, estados de ticket y prioridad de marcas: reglas de negoci
 ## Gastos generales y borrado de tickets (R12)
 
 Gastos operativos independientes de creadores/marcas/ciclos, y borrado lógico/físico de tickets (con reversión de ciclo si el ticket estaba aprobado): reglas de negocio completas en `doc/gastos-generales-manual.md` y `doc/borrado-tickets.md`. Resumen en "Reglas criticas" arriba.
+
+## Responsividad móvil
+
+App usable desde 320px de ancho (ver auditoría original en `docs/auditoria-responsividad-movil.md`). Infraestructura y detalle de qué se implementó: `doc/responsividad-movil.md`. Resumen de las reglas que más importan está en "Reglas criticas" arriba.
 
 ## Deploy
 

@@ -15,7 +15,7 @@ export default function KpiCard({ title, value, subtitle, accent = "orange" }) {
     >
       <p className="go-eyebrow">{title}</p>
       <p
-        className="font-display text-[28px] font-bold tracking-tight"
+        className="font-display text-2xl sm:text-[28px] font-bold tracking-tight"
         style={{ color: "var(--go-text-primary)" }}
       >
         {value}

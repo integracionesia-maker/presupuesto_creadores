@@ -49,7 +49,7 @@ export default function DeleteConfirmModal({ itemLabel, onClose, onSoftDelete, o
 
   return (
     <Modal title={step === "soft" ? "Eliminar" : "Eliminar permanentemente"} onClose={onClose} submitting={submitting}>
-      <div className="space-y-4 px-6 py-5">
+      <div className="space-y-4 px-4 sm:px-6 py-5">
         {step === "soft" ? (
           <>
             <p className="font-body text-sm" style={{ color: "var(--go-text-primary)" }}>

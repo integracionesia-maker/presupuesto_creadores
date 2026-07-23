@@ -9,7 +9,7 @@ export default function ThemeToggle() {
       onClick={toggleTheme}
       title={isDark ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
       aria-label={isDark ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
-      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-go transition-colors hover:bg-white/5"
+      className="flex h-10 w-10 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-go transition-colors hover:bg-white/5"
       style={{ color: "var(--go-text-secondary)" }}
     >
       {isDark ? (

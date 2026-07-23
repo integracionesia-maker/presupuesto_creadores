@@ -139,7 +139,7 @@
 
   /* ── GO card ──────────────────────────────────────────────────────── */
   .go-card {
-    @apply rounded-go-lg border p-6;
+    @apply rounded-go-lg border p-4 sm:p-6;
     background: var(--go-surface-raised);
     border-color: var(--go-border);
   }
@@ -260,6 +260,32 @@
 }
 :root[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
   filter: none;
+}
+
+/* ── Indicador de scroll horizontal en tablas (auditoría móvil, C1) ──────
+   Solo bajo el breakpoint md: en desktop las tablas caben sin scroll. El
+   degradado avisa que hay columnas ocultas a la derecha sin necesitar JS
+   para detectar la posición real del scroll (alternativa mínima aceptada
+   en docs/auditoria-responsividad-movil.md). Envolver el div existente de
+   `overflow-x-auto` con un padre `.go-table-scroll-wrapper`, y agregar la
+   clase `go-table-scroll` al propio div con overflow. */
+@media (max-width: 767px) {
+  .go-table-scroll-wrapper {
+    position: relative;
+  }
+  .go-table-scroll-wrapper::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 24px;
+    pointer-events: none;
+    background: linear-gradient(to right, transparent, var(--go-surface));
+  }
+  .go-table-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* ── Pantalla de carga (LoadingScreen) ────────────────────────────────── */

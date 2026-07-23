@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import Chart from "react-apexcharts";
 import { createApexOptions, formatChartCurrency, GO_CHART_COLORS } from "./apexTheme";
 import { useTheme } from "../../context/ThemeContext";
+import { useMobile } from "../../hooks/useMobile";
 
 const MONTHS_ES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -17,6 +18,7 @@ function monthLabel(ym) {
 export default function GeneralExpensesChart({ data, forceTheme }) {
   const { theme: ctxTheme } = useTheme();
   const theme = forceTheme || ctxTheme;
+  const isMobile = useMobile();
   const options = useMemo(() => {
     return createApexOptions({
       chart: {
@@ -77,6 +79,6 @@ export default function GeneralExpensesChart({ data, forceTheme }) {
   }
 
   return (
-    <Chart key={theme} options={options} series={series} type="bar" height={320} width="100%" />
+    <Chart key={theme} options={options} series={series} type="bar" height={isMobile ? 220 : 320} width="100%" />
   );
 }

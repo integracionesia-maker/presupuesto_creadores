@@ -135,7 +135,7 @@ export default function ProfilePage() {
                 : ""}
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <p className="font-body text-xs" style={{ color: "var(--go-text-secondary)" }}>
                 Monto del ciclo

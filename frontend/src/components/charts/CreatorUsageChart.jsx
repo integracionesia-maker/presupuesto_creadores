@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import Chart from "react-apexcharts";
 import { createApexOptions, GO_CHART_COLORS } from "./apexTheme";
 import { useTheme } from "../../context/ThemeContext";
+import { useMobile } from "../../hooks/useMobile";
 
 function usageColor(pct) {
   if (pct >= 90) return "#E53E3E"; // go-error
@@ -12,6 +13,7 @@ function usageColor(pct) {
 export default function CreatorUsageChart({ data, forceTheme }) {
   const { theme: ctxTheme } = useTheme();
   const theme = forceTheme || ctxTheme;
+  const isMobile = useMobile();
   const options = useMemo(() => {
     const items = (data || []).filter((d) => d.spent > 0);
     return createApexOptions({
@@ -80,6 +82,6 @@ export default function CreatorUsageChart({ data, forceTheme }) {
   }
 
   return (
-    <Chart key={theme} options={options} series={series} type="bar" height={320} width="100%" />
+    <Chart key={theme} options={options} series={series} type="bar" height={isMobile ? 220 : 320} width="100%" />
   );
 }

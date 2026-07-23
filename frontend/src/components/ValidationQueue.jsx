@@ -4,6 +4,7 @@ import { PRIORITY_BADGE_CLASS, PRIORITY_LABELS } from "../utils/priority";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import MediaViewerModal from "./MediaViewerModal";
 import Modal from "./Modal";
+import RowActions from "./RowActions";
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat("es-MX", {
@@ -118,7 +119,8 @@ export default function ValidationQueue({ onChange }) {
           <p>No hay tickets pendientes de validación.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-go-lg border" style={{ borderColor: "var(--go-border)" }}>
+        <div className="go-table-scroll-wrapper">
+        <div className="overflow-x-auto go-table-scroll rounded-go-lg border" style={{ borderColor: "var(--go-border)" }}>
           <table className="go-table">
             <thead>
               <tr>
@@ -161,26 +163,21 @@ export default function ValidationQueue({ onChange }) {
                       {cycleRemaining != null ? formatCurrency(cycleRemaining) : "—"}
                     </td>
                     <td>
-                      <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => setViewerTicket(t)} className="btn-go-ghost text-xs px-3 py-1.5">
-                          Ver
-                        </button>
-                        <button onClick={() => setApproveTarget(t)} className="btn-go-ghost text-xs px-3 py-1.5">
-                          Aprobar
-                        </button>
-                        <button
-                          onClick={() => {
-                            setRejectTarget(t);
-                            setRejectReason("");
-                          }}
-                          className="btn-go-ghost text-xs px-3 py-1.5"
-                        >
-                          Rechazar
-                        </button>
-                        <button onClick={() => setDeleteTarget(t)} className="btn-go-ghost text-xs px-3 py-1.5">
-                          Eliminar
-                        </button>
-                      </div>
+                      <RowActions
+                        actions={[
+                          { key: "ver", label: "Ver", onClick: () => setViewerTicket(t) },
+                          { key: "aprobar", label: "Aprobar", onClick: () => setApproveTarget(t) },
+                          {
+                            key: "rechazar",
+                            label: "Rechazar",
+                            onClick: () => {
+                              setRejectTarget(t);
+                              setRejectReason("");
+                            },
+                          },
+                          { key: "eliminar", label: "Eliminar", variant: "danger", onClick: () => setDeleteTarget(t) },
+                        ]}
+                      />
                     </td>
                   </tr>
                 );
@@ -188,13 +185,14 @@ export default function ValidationQueue({ onChange }) {
             </tbody>
           </table>
         </div>
+        </div>
       )}
 
       {viewerTicket && <MediaViewerModal ticket={viewerTicket} onClose={() => setViewerTicket(null)} />}
 
       {approveTarget && (
         <Modal title="Aprobar ticket" onClose={() => setApproveTarget(null)} submitting={submitting}>
-          <div className="space-y-4 px-6 py-5">
+          <div className="space-y-4 px-4 sm:px-6 py-5">
             <p className="font-body text-sm" style={{ color: "var(--go-text-primary)" }}>
               ¿Aprobar el ticket de <strong>{approveTarget.creator_name}</strong> por{" "}
               <strong>{formatCurrency(approveTarget.amount)}</strong>?
@@ -222,7 +220,7 @@ export default function ValidationQueue({ onChange }) {
 
       {rejectTarget && (
         <Modal title="Rechazar ticket" onClose={() => setRejectTarget(null)} submitting={submitting}>
-          <div className="space-y-4 px-6 py-5">
+          <div className="space-y-4 px-4 sm:px-6 py-5">
             <p className="font-body text-sm" style={{ color: "var(--go-text-primary)" }}>
               Rechazar el ticket de <strong>{rejectTarget.creator_name}</strong> por{" "}
               <strong>{formatCurrency(rejectTarget.amount)}</strong>. El motivo es obligatorio y lo verá el creador.

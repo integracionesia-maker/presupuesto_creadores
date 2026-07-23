@@ -2,10 +2,12 @@ import { useMemo } from "react";
 import Chart from "react-apexcharts";
 import { createApexOptions, formatChartCurrency, GO_CHART_COLORS } from "./apexTheme";
 import { useTheme } from "../../context/ThemeContext";
+import { useMobile } from "../../hooks/useMobile";
 
 export default function BrandSpendApexChart({ data, forceTheme }) {
   const { theme: ctxTheme } = useTheme();
   const theme = forceTheme || ctxTheme;
+  const isMobile = useMobile();
   const options = useMemo(() => {
     const items = (data || []).filter((d) => d.total_spent > 0);
     return createApexOptions({
@@ -58,6 +60,6 @@ export default function BrandSpendApexChart({ data, forceTheme }) {
   }
 
   return (
-    <Chart key={theme} options={options} series={series} type="bar" height={320} width="100%" />
+    <Chart key={theme} options={options} series={series} type="bar" height={isMobile ? 220 : 320} width="100%" />
   );
 }

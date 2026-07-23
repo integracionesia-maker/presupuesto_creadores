@@ -97,7 +97,7 @@ export default function Sidebar({ collapsed, onToggle, onNewTicket, pendingCount
               end={item.end}
               title={item.label}
               onClick={onCloseMobile}
-              className="flex items-center gap-3 rounded-go px-3 py-2.5 font-display text-sm font-semibold tracking-wide transition-all duration-200"
+              className="flex items-center gap-3 rounded-go px-3 py-3 md:py-2.5 font-display text-sm font-semibold tracking-wide transition-all duration-200"
               style={({ isActive }) => ({
                 background: isActive ? "var(--go-surface-sunken)" : "transparent",
                 color: isActive ? "var(--go-orange)" : "var(--go-text-secondary)",
@@ -128,7 +128,7 @@ export default function Sidebar({ collapsed, onToggle, onNewTicket, pendingCount
             to={PROFILE_ITEM.to}
             title={PROFILE_ITEM.label}
             onClick={onCloseMobile}
-            className="flex items-center gap-3 rounded-go px-3 py-2.5 font-display text-sm font-semibold tracking-wide transition-all duration-200 md:hidden"
+            className="flex items-center gap-3 rounded-go px-3 py-3 font-display text-sm font-semibold tracking-wide transition-all duration-200 md:hidden"
             style={({ isActive }) => ({
               background: isActive ? "var(--go-surface-sunken)" : "transparent",
               color: isActive ? "var(--go-orange)" : "var(--go-text-secondary)",

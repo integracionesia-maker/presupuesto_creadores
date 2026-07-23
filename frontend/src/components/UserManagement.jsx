@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createUser, fetchUsers, resetUserPassword, setUserActive, updateUser } from "../api";
 import { useAuth } from "../context/AuthContext";
 import Modal from "./Modal";
+import RowActions from "./RowActions";
 import { SortableHeaderCell } from "./SortableHeader";
 import { useSortable } from "../hooks/useSortable";
 
@@ -191,7 +192,8 @@ export default function UserManagement({ creators }) {
           <p>No hay usuarios registrados.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-go-lg border" style={{ borderColor: "var(--go-border)" }}>
+        <div className="go-table-scroll-wrapper">
+        <div className="overflow-x-auto go-table-scroll rounded-go-lg border" style={{ borderColor: "var(--go-border)" }}>
           <table className="go-table">
             <thead>
               <tr>
@@ -250,26 +252,23 @@ export default function UserManagement({ creators }) {
                       {formatLastLogin(u.last_login)}
                     </td>
                     <td>
-                      <div className="flex items-center justify-end gap-2">
-                        {!isTargetSuperadmin && (
-                          <>
-                            <button onClick={() => openEditForm(u)} className="btn-go-ghost text-xs px-3 py-1.5">
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => handleResetPassword(u)}
-                              className="btn-go-ghost text-xs px-3 py-1.5"
-                            >
-                              Resetear contraseña
-                            </button>
-                          </>
-                        )}
-                        {!isTargetSuperadmin && (
-                          <button onClick={() => openToggleConfirm(u)} className="btn-go-ghost text-xs px-3 py-1.5">
-                            {u.is_active ? "Desactivar" : "Activar"}
-                          </button>
-                        )}
-                      </div>
+                      <RowActions
+                        actions={[
+                          !isTargetSuperadmin && { key: "editar", label: "Editar", onClick: () => openEditForm(u) },
+                          !isTargetSuperadmin && {
+                            key: "reset",
+                            label: "Resetear contraseña",
+                            mobileLabel: "Reset",
+                            onClick: () => handleResetPassword(u),
+                          },
+                          !isTargetSuperadmin && {
+                            key: "toggle",
+                            label: u.is_active ? "Desactivar" : "Activar",
+                            variant: u.is_active ? "danger" : undefined,
+                            onClick: () => openToggleConfirm(u),
+                          },
+                        ]}
+                      />
                     </td>
                   </tr>
                 );
@@ -277,11 +276,12 @@ export default function UserManagement({ creators }) {
             </tbody>
           </table>
         </div>
+        </div>
       )}
 
       {formOpen && (
         <Modal title={editingUser ? "Editar Usuario" : "Crear Usuario"} onClose={closeForm} submitting={submitting}>
-          <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+          <form onSubmit={handleSubmit} className="space-y-4 px-4 sm:px-6 py-5">
             {!editingUser && (
               <div>
                 <label className="go-eyebrow mb-1.5 block">Usuario</label>
@@ -386,7 +386,7 @@ export default function UserManagement({ creators }) {
 
       {confirmToggle && (
         <Modal title="Confirmar cambio de estado" onClose={() => setConfirmToggle(null)} submitting={submitting}>
-          <div className="space-y-4 px-6 py-5">
+          <div className="space-y-4 px-4 sm:px-6 py-5">
             <p className="font-body text-sm" style={{ color: "var(--go-text-primary)" }}>
               {confirmToggle.newActive
                 ? `¿Reactivar a ${confirmToggle.user.full_name}?`
@@ -414,7 +414,7 @@ export default function UserManagement({ creators }) {
 
       {resetResult && (
         <Modal title="Contraseña temporal generada" onClose={() => setResetResult(null)}>
-          <div className="space-y-4 px-6 py-5">
+          <div className="space-y-4 px-4 sm:px-6 py-5">
             <p className="font-body text-sm" style={{ color: "var(--go-text-primary)" }}>
               Comparte esta contraseña temporal con <strong>{resetResult.username}</strong> por un canal seguro.
               Solo se muestra una vez.
