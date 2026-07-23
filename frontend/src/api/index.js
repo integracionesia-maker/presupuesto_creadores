@@ -246,8 +246,9 @@ export function fetchGeneralExpenses({ startDate, endDate } = {}) {
   return request(`/general-expenses/${qs ? `?${qs}` : ""}`);
 }
 
-export async function createGeneralExpense({ amount, description, file }) {
+export async function createGeneralExpense({ brandId, amount, description, file }) {
   const formData = new FormData();
+  formData.append("brand_id", brandId);
   formData.append("amount", amount);
   formData.append("description", description);
   formData.append("file", file);

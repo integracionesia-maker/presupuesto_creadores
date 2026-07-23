@@ -43,7 +43,7 @@ function today() {
   return new Date(t.getFullYear(), t.getMonth(), t.getDate());
 }
 
-export default function GeneralExpensesPage() {
+export default function GeneralExpensesPage({ brands = [] }) {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -194,6 +194,7 @@ export default function GeneralExpensesPage() {
               <thead>
                 <tr>
                   <th>Fecha</th>
+                  <th>Marca</th>
                   <th>Descripción</th>
                   <th className="text-right">Monto</th>
                   <th className="text-center">Acciones</th>
@@ -204,6 +205,11 @@ export default function GeneralExpensesPage() {
                   <tr key={expense.id}>
                     <td style={{ color: "var(--go-text-secondary)" }}>
                       {formatDate(expense.upload_date)}
+                    </td>
+                    <td>
+                      <span className="font-display text-sm font-semibold" style={{ color: "var(--go-text-primary)" }}>
+                        {expense.brand_name || `ID ${expense.brand_id}`}
+                      </span>
                     </td>
                     <td style={{ color: "var(--go-text-primary)" }}>
                       {expense.description}
@@ -238,7 +244,7 @@ export default function GeneralExpensesPage() {
       )}
 
       {createModalOpen && (
-        <GeneralExpenseModal onClose={() => setCreateModalOpen(false)} onSuccess={handleExpenseCreated} />
+        <GeneralExpenseModal brands={brands} onClose={() => setCreateModalOpen(false)} onSuccess={handleExpenseCreated} />
       )}
 
       {exportModalOpen && <GeneralExpensesExportModal onClose={() => setExportModalOpen(false)} />}

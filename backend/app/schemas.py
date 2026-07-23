@@ -128,10 +128,12 @@ class MessageResponse(BaseModel):
 class GeneralExpenseCreate(BaseModel):
     amount: float = Field(..., gt=0)
     description: str = Field(..., min_length=1, max_length=500)
+    brand_id: int = Field(..., gt=0)
 
 
 class GeneralExpenseResponse(BaseModel):
     id: int
+    brand_id: int
     amount: float
     description: str
     file_name: str
@@ -141,6 +143,8 @@ class GeneralExpenseResponse(BaseModel):
     created_by_user_id: Optional[int] = None
     is_deleted: bool
     deleted_at: Optional[datetime] = None
+    brand_name: Optional[str] = None
+    brand_priority: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

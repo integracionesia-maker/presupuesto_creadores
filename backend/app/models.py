@@ -134,14 +134,18 @@ class Ticket(Base):
 
 
 class GeneralExpense(Base):
-    """Gasto operativo NO vinculado a un creador/marca (apps, servicios, etc.).
+    """Gasto operativo vinculado a una marca (apps, servicios, suscripciones, etc.).
     Tabla independiente de `tickets` a propósito: no tiene ciclo de presupuesto
     ni estado de validación — se crea y cuenta de inmediato (solo admin/superadmin,
-    ver doc/gastos-generales-manual.md)."""
+    ver doc/gastos-generales-manual.md).
+
+    Tiene brand_id (no nullable) porque TODO gasto general debe estar asociado a
+    una marca para trazabilidad y reportes por marca."""
 
     __tablename__ = "general_expenses"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    brand_id = Column(Integer, ForeignKey("brands.id", ondelete="RESTRICT"), nullable=False)
     amount = Column(Float, nullable=False)
     description = Column(Text, nullable=False)
     file_name = Column(String(255), nullable=False)
@@ -154,6 +158,7 @@ class GeneralExpense(Base):
     deleted_at = Column(DateTime, nullable=True)
     deleted_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
+    brand = relationship("Brand", lazy="selectin")
     created_by = relationship("User", foreign_keys=[created_by_user_id], lazy="selectin")
     deleted_by = relationship("User", foreign_keys=[deleted_by_user_id], lazy="selectin")
 

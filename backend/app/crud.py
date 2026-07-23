@@ -505,6 +505,7 @@ def get_dashboard_summary(
 def create_general_expense(
     db: Session,
     *,
+    brand: models.Brand,
     amount: float,
     description: str,
     file_name: str,
@@ -513,6 +514,7 @@ def create_general_expense(
     actor_user_id: int,
 ) -> models.GeneralExpense:
     expense = models.GeneralExpense(
+        brand_id=brand.id,
         amount=amount,
         description=description,
         file_name=file_name,

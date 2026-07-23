@@ -245,7 +245,7 @@ class TestGeneralExpensesPermissions:
     def test_creador_cannot_create(self, logged_in_creador):
         resp = logged_in_creador.post(
             "/api/general-expenses/",
-            data={"amount": "100", "description": "x"},
+            data={"brand_id": "1", "amount": "100", "description": "x"},
             files={"file": ("f.pdf", b"%PDF-1.4", "application/pdf")},
         )
         assert resp.status_code == 403
@@ -253,10 +253,10 @@ class TestGeneralExpensesPermissions:
     def test_creador_cannot_list(self, logged_in_creador):
         assert logged_in_creador.get("/api/general-expenses/").status_code == 403
 
-    def test_admin_can_create_and_list(self, logged_in_admin):
+    def test_admin_can_create_and_list(self, logged_in_admin, brand_a):
         create_resp = logged_in_admin.post(
             "/api/general-expenses/",
-            data={"amount": "100", "description": "x"},
+            data={"brand_id": str(brand_a.id), "amount": "100", "description": "x"},
             files={"file": ("f.pdf", b"%PDF-1.4", "application/pdf")},
         )
         assert create_resp.status_code == 201

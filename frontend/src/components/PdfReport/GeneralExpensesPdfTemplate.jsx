@@ -69,7 +69,7 @@ export default function GeneralExpensesPdfTemplate({ months, items, total, gener
               Grupo Ortiz — Reporte de Gastos Generales
             </h1>
             <p className="font-body" style={{ margin: 0, fontSize: "11px", color: "#535353" }}>
-              Reporte de gastos operativos no ligados a creadores
+              Reporte de gastos operativos por marca
             </p>
           </div>
         </div>
@@ -100,6 +100,7 @@ export default function GeneralExpensesPdfTemplate({ months, items, total, gener
               <thead>
                 <tr>
                   <th>Fecha</th>
+                  <th>Marca</th>
                   <th>Descripción</th>
                   <th style={{ textAlign: "right" }}>Monto</th>
                   <th>Comprobante</th>
@@ -109,6 +110,7 @@ export default function GeneralExpensesPdfTemplate({ months, items, total, gener
                 {items.map((item) => (
                   <tr key={item.id}>
                     <td>{formatDateShort(item.upload_date)}</td>
+                    <td>{item.brand_name || `ID ${item.brand_id}`}</td>
                     <td>{item.description}</td>
                     <td className="num" style={{ textAlign: "right" }}>{formatCurrency(item.amount)}</td>
                     <td>{item.file_name}</td>

@@ -1,6 +1,6 @@
-"""REST endpoints para gastos generales (R12): gastos operativos NO vinculados
-a creadores/marcas. Solo admin/superadmin — no pasan por validación, no tienen
-ciclo de presupuesto. Ver doc/gastos-generales-manual.md."""
+"""REST endpoints para gastos generales (R12): gastos operativos vinculados a
+una marca. Solo admin/superadmin — no pasan por validación, no tienen ciclo de
+presupuesto. Ver doc/gastos-generales-manual.md."""
 
 from datetime import date
 from typing import List, Optional
@@ -18,7 +18,21 @@ router = APIRouter(prefix="/api/general-expenses", tags=["general-expenses"])
 
 
 def _expense_to_response(e: models.GeneralExpense) -> schemas.GeneralExpenseResponse:
-    return schemas.GeneralExpenseResponse.model_validate(e)
+    return schemas.GeneralExpenseResponse(
+        id=e.id,
+        brand_id=e.brand_id,
+        amount=e.amount,
+        description=e.description,
+        file_name=e.file_name,
+        file_path=e.file_path,
+        mime_type=e.mime_type,
+        upload_date=e.upload_date,
+        created_by_user_id=e.created_by_user_id,
+        is_deleted=e.is_deleted,
+        deleted_at=e.deleted_at,
+        brand_name=e.brand.name if e.brand else None,
+        brand_priority=e.brand.priority if e.brand else None,
+    )
 
 
 @router.get("/", response_model=List[schemas.GeneralExpenseResponse])
@@ -65,6 +79,7 @@ def download_general_expense_file(
 
 @router.post("/", response_model=schemas.GeneralExpenseResponse, status_code=201)
 def create_general_expense(
+    brand_id: int = Form(..., gt=0),
     amount: float = Form(..., gt=0),
     description: str = Form(..., min_length=1, max_length=500),
     file: UploadFile = File(...),
@@ -74,10 +89,17 @@ def create_general_expense(
     file_path_on_disk: Optional[str] = None
 
     try:
+        brand = crud.get_brand(db, brand_id)
+        if not brand:
+            raise HTTPException(status_code=404, detail="Marca no encontrada.")
+        if not brand.is_active:
+            raise HTTPException(status_code=400, detail="La marca está inactiva.")
+
         file_name, file_path_on_disk, mime_type = save_upload(file)
 
         expense = crud.create_general_expense(
             db=db,
+            brand=brand,
             amount=amount,
             description=description,
             file_name=file_name,
@@ -91,6 +113,7 @@ def create_general_expense(
             action="general-expense.create",
             target_type="general_expense",
             target_id=expense.id,
+            details=f"brand_id={brand_id}",
         )
         return _expense_to_response(expense)
 

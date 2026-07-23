@@ -234,7 +234,7 @@ function AppShell() {
               path="/gastos-generales"
               element={
                 <ProtectedRoute roles={ADMIN_ROLES}>
-                  <GeneralExpensesPage />
+                  <GeneralExpensesPage brands={brands} />
                 </ProtectedRoute>
               }
             />

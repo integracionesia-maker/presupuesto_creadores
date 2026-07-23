@@ -9,11 +9,14 @@ const ALLOWED_MIME = [
   "application/pdf",
 ];
 
-export default function GeneralExpenseModal({ onClose, onSuccess }) {
+export default function GeneralExpenseModal({ brands, onClose, onSuccess }) {
+  const [brandId, setBrandId] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
+
+  const activeBrands = (brands || []).filter((b) => b.is_active);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -79,6 +82,10 @@ export default function GeneralExpenseModal({ onClose, onSuccess }) {
     setError(null);
     setSuccessMsg(null);
 
+    if (!brandId) {
+      setError("Selecciona una marca.");
+      return;
+    }
     if (!description || description.trim().length < 1) {
       setError("La descripción es obligatoria.");
       return;
@@ -99,6 +106,7 @@ export default function GeneralExpenseModal({ onClose, onSuccess }) {
     setSubmitting(true);
     try {
       await createGeneralExpense({
+        brandId: Number(brandId),
         amount: Number(amount),
         description,
         file,
@@ -154,6 +162,24 @@ export default function GeneralExpenseModal({ onClose, onSuccess }) {
 
         {/* ── Body ────────────────────────────────────────────────── */}
         <form onSubmit={handleSubmit} className="space-y-4 px-4 sm:px-6 py-5">
+          {/* Brand selector */}
+          <div>
+            <label className="go-eyebrow mb-1.5 block">Marca</label>
+            <select
+              value={brandId}
+              onChange={(e) => setBrandId(e.target.value)}
+              className="go-select"
+              required
+            >
+              <option value="">Seleccionar marca...</option>
+              {activeBrands.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Description */}
           <div>
             <label className="go-eyebrow mb-1.5 block">Descripción</label>
